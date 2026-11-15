@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Barnyard Linux
+Comment=Unofficial community native port; requires owned PC game data
+Exec=barnyard-linux
+Icon=barnyard-linux
+Terminal=false
+Categories=Game;AdventureGame;
+StartupNotify=true
+StartupWMClass=barnyard-linux
+Actions=ChooseFolder;Diagnostic;
+
+[Desktop Action ChooseFolder]
+Name=Pilih folder game
+Exec=barnyard-linux --choose-folder
+
+[Desktop Action Diagnostic]
+Name=Diagnostik dan log
+Exec=barnyard-linux --diagnostic

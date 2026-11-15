@@ -1,0 +1,1 @@
+PASS: real X11 SDL window title, barnyard-linux WM_CLASS, matching 256px _NET_WM_ICON with transparent corners and opaque center. Not a full desktop/gameplay test.

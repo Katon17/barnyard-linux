@@ -1,0 +1,246 @@
+diff --git a/Toshi/Source/Platform/GL/TGLFont.cpp b/Toshi/Source/Platform/GL/TGLFont.cpp
+index 6c8f839..502eb96 100644
+--- a/Toshi/Source/Platform/GL/TGLFont.cpp
++++ b/Toshi/Source/Platform/GL/TGLFont.cpp
+@@ -90,7 +90,7 @@ TBOOL TGLFont::InitDeviceObjects( TRenderGLInterface* a_pRenderer )
+ 	else
+ 		m_dwTexWidth = m_dwTexHeight = 256;
+ 
+-#ifdef TOSHI_SKU_WASM
++#if defined(TOSHI_SKU_WASM) || defined(TOSHI_SKU_LINUX)
+ 	return BuildBuiltInAtlas();
+ #else
+ 	// Render the characters with GDI
+@@ -173,7 +173,7 @@ TBOOL TGLFont::InitDeviceObjects( TRenderGLInterface* a_pRenderer )
+ #endif
+ }
+ 
+-#ifdef TOSHI_SKU_WASM
++#if defined(TOSHI_SKU_WASM) || defined(TOSHI_SKU_LINUX)
+ 
+ // 5x7 glyphs of the printable ASCII characters, a column per byte
+ static const TUINT8 s_aGlyphs[ 95 ][ 5 ] = {
+diff --git a/Toshi/Source/Platform/GL/TGLFont.h b/Toshi/Source/Platform/GL/TGLFont.h
+index 40fb6f7..d6d837c 100644
+--- a/Toshi/Source/Platform/GL/TGLFont.h
++++ b/Toshi/Source/Platform/GL/TGLFont.h
+@@ -48,7 +48,7 @@ public:
+ private:
+ 	void DrawTriangles( TUINT a_dwNumTriangles );
+ 
+-#ifdef TOSHI_SKU_WASM
++#if defined(TOSHI_SKU_WASM) || defined(TOSHI_SKU_LINUX)
+ 	TBOOL BuildBuiltInAtlas();
+ #endif
+ 
+diff --git a/Toshi/Source/Platform/GL/TMouse_GL.cpp b/Toshi/Source/Platform/GL/TMouse_GL.cpp
+index 5b4df25..63af370 100644
+--- a/Toshi/Source/Platform/GL/TMouse_GL.cpp
++++ b/Toshi/Source/Platform/GL/TMouse_GL.cpp
+@@ -15,7 +15,11 @@ TDEFINE_CLASS( TMouse_GL );
+ TMouse_GL::~TMouse_GL()
+ {
+ 	if ( m_hCursor )
++		#ifdef TOSHI_SKU_LINUX
++		SDL_FreeCursor( m_hCursor );
++#else
+ 		DestroyCursor( m_hCursor );
++#endif
+ }
+ 
+ TBOOL TMouse_GL::SetCursor( const TWCHAR* a_wszFileName )
+@@ -41,6 +45,27 @@ TBOOL TMouse_GL::SetCursor( const TWCHAR* a_wszFileName )
+ 	if ( !pPixels )
+ 		return TFALSE;
+ 
++#ifdef TOSHI_SKU_LINUX
++	if (!uiWidth || !uiHeight) { TFree(pPixels); return TFALSE; }
++	SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, 32, 32, 32, SDL_PIXELFORMAT_RGBA32);
++	if (!surface) { TFree(pPixels); return TFALSE; }
++	for (TUINT y = 0; y < 32; ++y) {
++		auto* dest = static_cast<TUINT8*>(surface->pixels) + y * surface->pitch;
++		for (TUINT x = 0; x < 32; ++x) {
++			const auto* src = pPixels + (y * uiHeight / 32 * uiWidth + x * uiWidth / 32) * 4;
++			memcpy(dest + x * 4, src, 4);
++			if (src[0] == 0 && src[1] == 0 && src[2] == 0 && src[3] == 255) dest[x*4+3] = 0;
++		}
++	}
++	TFree(pPixels);
++	SDL_Cursor* cursor = SDL_CreateColorCursor(surface, 0, 0);
++	SDL_FreeSurface(surface);
++	if (!cursor) return TFALSE;
++	if (m_hCursor) SDL_FreeCursor(m_hCursor);
++	m_hCursor = cursor;
++	SDL_SetCursor(cursor);
++	return TTRUE;
++#else
+ 	BITMAPV5HEADER oHeader = {};
+ 	oHeader.bV5Size        = sizeof( BITMAPV5HEADER );
+ 	oHeader.bV5Width       = 32;
+@@ -96,12 +121,17 @@ TBOOL TMouse_GL::SetCursor( const TWCHAR* a_wszFileName )
+ 		return TFALSE;
+ 
+ 	if ( m_hCursor )
++		#ifdef TOSHI_SKU_LINUX
++		SDL_FreeCursor( m_hCursor );
++#else
+ 		DestroyCursor( m_hCursor );
++#endif
+ 
+ 	m_hCursor = hCursor;
+ 	::SetCursor( m_hCursor );
+ 
+ 	return TTRUE;
++#endif
+ }
+ 
+ TOSHI_NAMESPACE_END
+diff --git a/Toshi/Source/Platform/GL/TMouse_GL.h b/Toshi/Source/Platform/GL/TMouse_GL.h
+index a4793f9..2ddf865 100644
+--- a/Toshi/Source/Platform/GL/TMouse_GL.h
++++ b/Toshi/Source/Platform/GL/TMouse_GL.h
+@@ -1,9 +1,18 @@
+ #pragma once
+ #include "Toshi/TObject.h"
+ #include "Toshi/TSingleton.h"
++#ifdef TOSHI_SKU_LINUX
++# include <SDL2/SDL.h>
++#endif
+ 
+ TOSHI_NAMESPACE_START
+ 
++#ifdef TOSHI_SKU_LINUX
++using CursorHandle = SDL_Cursor*;
++#else
++using CursorHandle = HCURSOR;
++#endif
++
+ // Mouse cursor of the window, TMSWindow::WndProc restores its image on WM_SETCURSOR
+ class TMouse_GL
+     : public TObject
+@@ -23,10 +32,10 @@ public:
+ 	// Loads the cursor image (32x32) from a_wszFileName and makes it the cursor of the window
+ 	virtual TBOOL SetCursor( const TWCHAR* a_wszFileName );
+ 
+-	HCURSOR GetCursor() const { return m_hCursor; }
++	CursorHandle GetCursor() const { return m_hCursor; }
+ 
+ private:
+-	HCURSOR m_hCursor;
++	CursorHandle m_hCursor;
+ 	TBOOL   m_bUnk; // never used
+ };
+ 
+diff --git a/Toshi/Source/Platform/GL/TRenderAdapter_GL.cpp b/Toshi/Source/Platform/GL/TRenderAdapter_GL.cpp
+index 21bb178..3715fd9 100644
+--- a/Toshi/Source/Platform/GL/TRenderAdapter_GL.cpp
++++ b/Toshi/Source/Platform/GL/TRenderAdapter_GL.cpp
+@@ -3,6 +3,10 @@
+ 
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/TWindow_WASM.h"
++#elif defined(TOSHI_SKU_LINUX)
++#  include <SDL2/SDL.h>
++#  include <set>
++#  include <tuple>
+ #endif
+ 
+ //-----------------------------------------------------------------------------
+@@ -93,6 +97,27 @@ void TGLAdapter::EnumerateOutputs( TRenderInterface* a_pRenderer )
+ 		if ( oMode.dmBitsPerPel == 32 )
+ 			fnAddMode( oMode.dmPelsWidth, oMode.dmPelsHeight, oMode.dmDisplayFrequency );
+ 	}
++#elif defined(TOSHI_SKU_LINUX)
++	SDL_DisplayMode desktop{};
++	if (SDL_GetDesktopDisplayMode(0, &desktop) != 0) {
++		TERROR("SDL cannot query desktop display mode: %s\n", SDL_GetError());
++		return;
++	}
++	m_Mode.Set(this, 0, desktop.w, desktop.h, desktop.refresh_rate > 0 ? desktop.refresh_rate : 60);
++	std::set<std::tuple<int, int, int>> seen;
++	auto addUnique = [&](int w, int h, int hz) {
++		if (w > 0 && h > 0 && seen.emplace(w, h, hz).second) fnAddMode(w, h, hz);
++	};
++	for (int i = 0; i < SDL_GetNumDisplayModes(0); ++i) {
++		SDL_DisplayMode mode{};
++		if (SDL_GetDisplayMode(0, i, &mode) == 0)
++			addUnique(mode.w, mode.h, mode.refresh_rate > 0 ? mode.refresh_rate : 60);
++	}
++	// Windowed resolutions need not be physical monitor modes.
++	addUnique(desktop.w, desktop.h, desktop.refresh_rate > 0 ? desktop.refresh_rate : 60);
++	addUnique(1280, 720, 60);
++	addUnique(800, 600, 60);
++	addUnique(640, 480, 60);
+ #else
+ 	// The canvas can have any size, the page tells which one fits
+ 	TINT iWidth  = 0;
+diff --git a/Toshi/Source/Platform/GL/TRenderInterface_GL.h b/Toshi/Source/Platform/GL/TRenderInterface_GL.h
+index 47154cb..561bf79 100644
+--- a/Toshi/Source/Platform/GL/TRenderInterface_GL.h
++++ b/Toshi/Source/Platform/GL/TRenderInterface_GL.h
+@@ -6,6 +6,8 @@
+ 
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/TWindow_WASM.h"
++#elif defined(TOSHI_SKU_LINUX)
++#  include "Platform/Linux/TWindow_Linux.h"
+ #else
+ #  include "Platform/GL/TMSWindow.h"
+ #endif
+@@ -15,6 +17,8 @@ TOSHI_NAMESPACE_START
+ 
+ #ifdef TOSHI_SKU_WASM
+ using TGLWindow = TWindow_WASM;
++#elif defined(TOSHI_SKU_LINUX)
++using TGLWindow = TWindow_Linux;
+ #else
+ using TGLWindow = TMSWindow;
+ #endif
+diff --git a/Toshi/Source/Platform/GL/TVertexBlockResource_GL.cpp b/Toshi/Source/Platform/GL/TVertexBlockResource_GL.cpp
+index a956204..c2dd9e6 100644
+--- a/Toshi/Source/Platform/GL/TVertexBlockResource_GL.cpp
++++ b/Toshi/Source/Platform/GL/TVertexBlockResource_GL.cpp
+@@ -75,7 +75,7 @@ TBOOL TVertexBlockResource::CreateHAL()
+ 
+ 	for ( TUINT i = 0; i < m_HALBuffer.uiNumStreams; i++ )
+ 	{
+-		UINT length = vertexFormat.m_aStreamFormats[ i ].m_uiVertexSize * m_uiMaxVertices;
++		TUINT length = vertexFormat.m_aStreamFormats[ i ].m_uiVertexSize * m_uiMaxVertices;
+ 
+ 		if ( ISZERO( m_uiFlags & TVertexPoolResourceInterface::FLAGS_STATIC ) )
+ 		{
+diff --git a/Toshi/Source/Toshi/T2RedBlackTree.h b/Toshi/Source/Toshi/T2RedBlackTree.h
+index b6dc430..101b7e4 100644
+--- a/Toshi/Source/Toshi/T2RedBlackTree.h
++++ b/Toshi/Source/Toshi/T2RedBlackTree.h
+@@ -20,7 +20,7 @@ class MODAPI T2GenericRedBlackTreeNode
+ public:
+ 	friend class T2GenericRedBlackTree;
+ 
+-	template <class T, class C>
++	template <class NodeType, class Comparator>
+ 	friend class T2RedBlackTree;
+ 
+ protected:
+@@ -103,7 +103,7 @@ template <class T>
+ class T2RedBlackTreeNode : public T2GenericRedBlackTreeNode
+ {
+ public:
+-	template <class T, class C>
++	template <class NodeType, class Comparator>
+ 	friend class T2RedBlackTree;
+ 
+ public:
+diff --git a/Toshi/Source/Toshi/TGlobalEmitter.h b/Toshi/Source/Toshi/TGlobalEmitter.h
+index 3b002cf..5bb47fe 100644
+--- a/Toshi/Source/Toshi/TGlobalEmitter.h
++++ b/Toshi/Source/Toshi/TGlobalEmitter.h
+@@ -9,7 +9,7 @@ class TGenericGlobalListener : public TQList<TGenericGlobalListener<T>>::TNode
+ public:
+ 	using EventCallback = void ( * )( void*, const T& );
+ 
+-	template <class T>
++	template <class EventType>
+ 	friend class TGlobalEmitter;
+ 
+ protected:

@@ -1,0 +1,8 @@
+{
+  "launcher_contract": "barnyard-linux-env-v1",
+  "gameplay_verified": false,
+  "save_reload_verified": false,
+  "audio_video_verified": false,
+  "xdg_adapter_verified": false,
+  "note": "Do not change flags just to bypass packaging. Record real tests, hardware, upstream commit, binary hash, and data revision. No compatible engine currently exists in this starter."
+}

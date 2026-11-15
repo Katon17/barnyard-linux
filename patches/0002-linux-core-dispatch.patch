@@ -1,0 +1,37 @@
+diff --git a/Toshi/Source/Toshi/T2String.h b/Toshi/Source/Toshi/T2String.h
+index edec2b7..a484a6c 100644
+--- a/Toshi/Source/Toshi/T2String.h
++++ b/Toshi/Source/Toshi/T2String.h
+@@ -264,7 +264,7 @@ class T2StringParser
+ {
+ public:
+ 	using CharType    = typename StringTraits::CharType;
+-	using ConstString = typename T2StringViewBase<StringTraits>;
++	using ConstString = T2StringViewBase<StringTraits>;
+ 
+ public:
+ 	T2StringParser( ConstString a_pchBuffer, TSIZE a_uiBufferSize = -1 )
+diff --git a/Toshi/Source/Toshi/TSystem.h b/Toshi/Source/Toshi/TSystem.h
+index 2c050aa..9375633 100644
+--- a/Toshi/Source/Toshi/TSystem.h
++++ b/Toshi/Source/Toshi/TSystem.h
+@@ -3,6 +3,9 @@
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/TSystemDLL_WASM.h"
+ #endif
++#ifdef TOSHI_SKU_LINUX
++#  include "Platform/Linux/TSystemDLL_Linux.h"
++#endif
+ #include "TEvent.h"
+ #include "TSingleton.h"
+ #include "THPTimer.h"
+@@ -23,6 +26,9 @@ class TKernelInterfaceDLL :
+ #elif defined( TOSHI_SKU_WASM )
+     public TSystemDLLWASM
+     ,
++#elif defined( TOSHI_SKU_LINUX )
++    public TSystemDLLLinux
++    ,
+ #else
+ #  error Unsupported platform
+ #endif

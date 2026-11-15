@@ -1,0 +1,105 @@
+--- a/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
++++ b/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
+@@ -98,6 +98,20 @@
+ 		pRenderer->SetGamma( AOptions::GetSingleton()->GetGamma() );
+ 	}
+ 
++#ifdef TOSHI_SKU_LINUX
++    bool nativeDesktopFullscreen=false;
++    if(const char* fullscreen=getenv("BARNYARD_FULLSCREEN")) {
++        bWindowed=strcmp(fullscreen,"1")!=0;
++        nativeDesktopFullscreen=!bWindowed;
++        if(nativeDesktopFullscreen) {
++            SDL_DisplayMode desktop{};
++            int display=SDL_GetWindowDisplayIndex(pRenderer->GetWindow()->GetSDLWindow());
++            if(SDL_GetDesktopDisplayMode(display,&desktop)==0) {
++                iWidth=desktop.w; iHeight=desktop.h;
++            } else { bWindowed=TTRUE; nativeDesktopFullscreen=false; }
++        }
++    }
++#endif
+ 	if ( !m_DisplayModes.DoesModeExist( iWidth, iHeight, iColourDepth ) )
+ 	{
+ 		// Incompatible display mode
+@@ -112,6 +126,9 @@
+ 	displayParams.bWindowed           = bWindowed;
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	displayParams.bBorderless = AOptions::GetSingleton() && AOptions::GetSingleton()->IsBorderless();
++#ifdef TOSHI_SKU_LINUX
++    if(nativeDesktopFullscreen) displayParams.bBorderless=TTRUE;
++#endif
+ #endif // BARNYARD_COMMUNITY_PATCH
+ 	displayParams.uiColourDepth       = 32;
+ 	displayParams.eDepthStencilFormat = TRenderInterface::DEPTHSTENCILFORMAT_D16;
+@@ -140,6 +157,12 @@
+ 
+ 	if ( !pRenderer->CreateDisplay( displayParams ) )
+ 		return TFALSE;
++#ifdef TOSHI_SKU_LINUX
++    if(AOptions::GetSingleton()) AOptions::GetSingleton()->SetDisplay(
++        displayParams.uiWidth,displayParams.uiHeight,displayParams.bWindowed,displayParams.bBorderless);
++    fprintf(stderr,"Linux display: %ux%u %s\n",displayParams.uiWidth,displayParams.uiHeight,
++        displayParams.bWindowed?"windowed":"fullscreen");
++#endif
+ 
+ 	// Log info about the chosen device
+ 	TINFO( "--------------\n" );
+@@ -741,6 +764,23 @@
+ 	TBOOL bMoviePlaying = AMoviePlayer::IsSingletonCreated() && AMoviePlayer::GetSingleton()->IsMoviePlaying();
+ 
+ 	pRender->Update( a_fDeltaTime );
++#ifdef TOSHI_SKU_LINUX
++    if(pRender->GetWindow()->TakeFullscreenToggleRequest() && m_pViewport && m_pHALViewport1 && m_pHALViewport2) {
++        static int windowWidth=800,windowHeight=600;
++        auto* params=pRender->GetCurrentDisplayParams();
++        bool entering=params->bWindowed;
++        int width=windowWidth,height=windowHeight;
++        if(entering) {
++            windowWidth=params->uiWidth; windowHeight=params->uiHeight;
++            SDL_DisplayMode desktop{};
++            int display=SDL_GetWindowDisplayIndex(pRender->GetWindow()->GetSDLWindow());
++            if(SDL_GetDesktopDisplayMode(display,&desktop)==0) { width=desktop.w; height=desktop.h; }
++        }
++        bool changed=ChangeDisplay(width,height,!entering,entering);
++        fprintf(stderr,"Alt+Enter display %s: %dx%d %s\n",changed?"changed":"FAILED",width,height,entering?"desktop fullscreen":"windowed");
++    }
++#endif
++
+ 
+ 	if ( g_oSystemManager.IsPaused() )
+ 		return TFALSE;
+--- a/Toshi/Source/Platform/GL/TRenderInterface_GL.cpp
++++ b/Toshi/Source/Platform/GL/TRenderInterface_GL.cpp
+@@ -311,7 +311,12 @@
+ 		m_uiBackBufferWidth  = m_oDisplayParams.uiWidth;
+ 		m_uiBackBufferHeight = m_oDisplayParams.uiHeight;
+ 
++#ifdef TOSHI_SKU_LINUX
++        if(!m_Window.SetDisplayMode(m_uiBackBufferWidth,m_uiBackBufferHeight,m_oDisplayParams.bWindowed,m_oDisplayParams.bBorderless))
++            return TFALSE;
++#else
+ 		m_Window.SetDisplayMode( m_uiBackBufferWidth, m_uiBackBufferHeight, m_oDisplayParams.bWindowed, m_oDisplayParams.bBorderless );
++#endif
+ 
+ 		if ( !ResizeBackBuffer() )
+ 		{
+@@ -428,6 +433,9 @@
+ 	if ( !IsDisplayCreated() )
+ 		return TFALSE;
+ 
++#ifdef TOSHI_SKU_LINUX
++    if(!m_Window.SetDisplayMode(a_uiWidth,a_uiHeight,a_bWindowed,a_bBorderless)) return TFALSE;
++#endif
+ 	m_oDisplayParams.uiWidth     = a_uiWidth;
+ 	m_oDisplayParams.uiHeight    = a_uiHeight;
+ 	m_oDisplayParams.bWindowed   = a_bWindowed;
+@@ -435,7 +443,9 @@
+ 	m_uiBackBufferWidth          = a_uiWidth;
+ 	m_uiBackBufferHeight         = a_uiHeight;
+ 
++#ifndef TOSHI_SKU_LINUX
+ 	m_Window.SetDisplayMode( a_uiWidth, a_uiHeight, a_bWindowed, a_bBorderless );
++#endif
+ 
+ 	return ResizeBackBuffer();
+ }

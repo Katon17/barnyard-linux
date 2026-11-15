@@ -1,0 +1,20 @@
+--- a/OpenBarnyard/Source/AppBoot.cpp
++++ b/OpenBarnyard/Source/AppBoot.cpp
+@@ -213,10 +213,15 @@
+ 	postMessage( { bQuit : true } );
+ } );
+ #elif defined(TOSHI_SKU_LINUX)
+-// Before ordinary C++ statics, retaining the allocator through static destruction.
+-__attribute__((constructor(101))) static void InitialiseNativeMemory() {
++// ELF preinit runs BEFORE dependency DSO constructors as well as executable
++// C++ statics. constructor(101) is too late: libhwy (via FFmpeg) calls the
++// executable's overridden operator new from its own DSO initializer.
++static void InitialiseNativeMemory() {
+     if (InitialiseMemory() != 0) _Exit(90);
+ }
++using NativePreinit = void (*)();
++__attribute__((section(".preinit_array"),used))
++static NativePreinit initialiseNativeMemoryBeforeDSOs = InitialiseNativeMemory;
+ #else
+ #pragma section( ".CRT$XIT", long, read )
+ extern "C" __declspec( allocate( ".CRT$XIT" ) ) int( __cdecl* g_pfnCheckVirtualMemory )() = CheckVirtualMemory;

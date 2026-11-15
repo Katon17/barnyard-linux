@@ -1,0 +1,177 @@
+--- a/OpenBarnyard/Source/GameInterface/AOptionsState.h
++++ b/OpenBarnyard/Source/GameInterface/AOptionsState.h
+@@ -14,6 +14,7 @@
+ #ifdef TOSHI_SKU_LINUX
+         OPTIONSBUTTON_DISPLAY,
+         OPTIONSBUTTON_LANGUAGE,
++        OPTIONSBUTTON_ABOUT,
+ #endif
+ #ifdef BARNYARD_LATEST
+ 		// NOTE: the latest version (Wii) hides the controls button and adds this one
+@@ -28,7 +29,7 @@
+ 		282,
+ 		281,
+ #ifdef TOSHI_SKU_LINUX
+-        -1, -1, // Native display/language labels, not retail locale IDs.
++        -1, -1, -1, // Native display/language labels, not retail locale IDs.
+ #endif
+ #ifdef BARNYARD_LATEST
+ 		3482, // ACameraOptionsState::CAMERA_SPEED_TEXT (the button shows ACameraOptionsState::GetCameraText)
+--- a/OpenBarnyard/Source/GameInterface/AOptionsState.cpp
++++ b/OpenBarnyard/Source/GameInterface/AOptionsState.cpp
+@@ -2,6 +2,7 @@
+ #include "AOptionsState.h"
+ #ifdef TOSHI_SKU_LINUX
+ #include "Platform/Linux/NativePreferences.h"
++#include "Platform/Linux/ANativeAboutState.h"
+ #include "Render/ARenderer.h"
+ #include "Render/ABackend.h"
+ #include "AFrontEndMainMenuState2.h"
+@@ -59,6 +60,7 @@
+ {
+ #ifdef TOSHI_SKU_LINUX
+     bool id=BarnyardLinux::NativePreferences().indonesian;
++    if(a_iButton==OPTIONSBUTTON_ABOUT)return id?L"Tentang":L"About";
+     if(a_iButton==OPTIONSBUTTON_DISPLAY) {
+         bool full=!TRenderInterfaceHAL::Interface()->GetCurrentDisplayParams()->bWindowed;
+         return id ? (full?L"Tampilan: Layar penuh":L"Tampilan: Jendela") : (full?L"Display: Fullscreen":L"Display: Windowed");
+@@ -178,6 +180,10 @@
+ 			pState = new AAudioOptionsState();
+ 		else if ( m_iActivatedButtonID == OPTIONSBUTTON_CONTROLS )
+ 			pState = new AControlOptionsState();
++#ifdef TOSHI_SKU_LINUX
++        else if(m_iActivatedButtonID==OPTIONSBUTTON_ABOUT)
++            pState=new ANativeAboutState();
++#endif
+ #ifdef BARNYARD_LATEST
+ 		else if ( m_iActivatedButtonID == OPTIONSBUTTON_CAMERA )
+ 			pState = new ACameraOptionsState();
+--- a/OpenBarnyard/Source/GameInterface/AFrontEndMainMenuState2.h
++++ b/OpenBarnyard/Source/GameInterface/AFrontEndMainMenuState2.h
+@@ -17,12 +17,20 @@
+ 		FRONTENDBUTTON_OPTIONS,
+ 		FRONTENDBUTTON_BONUSES,
+ 		FRONTENDBUTTON_ANTICS,
++
++#ifdef TOSHI_SKU_LINUX
++        FRONTENDBUTTON_ABOUT,
++#endif
+ 		FRONTENDBUTTON_QUIT,
+ 		FRONTENDBUTTON_NUMOF
+ 	};
+ 
+ 	inline constexpr static TINT FRONTENDBUTTON_TEXTS[ FRONTENDBUTTON_NUMOF ] = {
+-		292, 293, 294, 296, 298, 333
++		292, 293, 294, 296, 298,
++#ifdef TOSHI_SKU_LINUX
++        -1,
++#endif
++        333
+ 	};
+ 
+ public:
+@@ -73,6 +81,9 @@
+ #endif
+ 
+ private:
++#ifdef TOSHI_SKU_LINUX
++    void FitNativeMenu();
++#endif
+ 	// Quits the game if Yes was chosen in the quit popup
+ 	static TBOOL __stdcall OnQuitPopupResponse( AFrontEndMainMenuState2* a_pState, AMessagePopupState* a_pPopup, AMessagePopupState::ResponseEvent* a_pEvent );
+ 
+--- a/OpenBarnyard/Source/GameInterface/AFrontEndMainMenuState2.cpp
++++ b/OpenBarnyard/Source/GameInterface/AFrontEndMainMenuState2.cpp
+@@ -1,4 +1,8 @@
+ #include "pch.h"
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/ANativeAboutState.h"
++#include "Platform/Linux/NativePreferences.h"
++#endif
+ #include "AFrontEndMainMenuState2.h"
+ #include "AGameStateController.h"
+ #include "Locale/ALocaleManager.h"
+@@ -59,6 +63,9 @@
+ 	m_pButtonRotations[ FRONTENDBUTTON_OPTIONS ]  = TMath::DegToRad( 2.0f );
+ 	m_pButtonRotations[ FRONTENDBUTTON_BONUSES ]  = TMath::DegToRad( -2.0f );
+ 	m_pButtonRotations[ FRONTENDBUTTON_ANTICS ]   = TMath::DegToRad( 2.0f );
++#ifdef TOSHI_SKU_LINUX
++    m_pButtonRotations[FRONTENDBUTTON_ABOUT]=0.0f;
++#endif
+ 	m_pButtonRotations[ FRONTENDBUTTON_QUIT ]     = TMath::DegToRad( -1.0f );
+ }
+ 
+@@ -201,7 +208,12 @@
+ 
+ 	for ( TINT i = 0; i < FRONTENDBUTTON_NUMOF; i++ )
+ 	{
+-		const TWCHAR* wszText = g_pLocaleManager->GetString( FRONTENDBUTTON_TEXTS[ i ] );
++		const TWCHAR* wszText;
++#ifdef TOSHI_SKU_LINUX
++        if(i==FRONTENDBUTTON_ABOUT)wszText=BarnyardLinux::NativePreferences().indonesian?L"Tentang":L"About";
++        else
++#endif
++        wszText=g_pLocaleManager->GetString(FRONTENDBUTTON_TEXTS[i]);
+ 
+ 		m_aButtons[ i ].Create( pFont, pFont->GetTextWidth( wszText ), wszText, 5.0f );
+ 		m_aButtons[ i ].SetFocusedColour( AGUI2STYLE_COLOR_FOCUSED );
+@@ -250,6 +262,9 @@
+ 
+ 	m_oDialog.SetTransform( 0.0f, 50.0f );
+ 	m_oMenu.SetTransform( 0.0f, 50.0f );
++#ifdef TOSHI_SKU_LINUX
++    FitNativeMenu();
++#endif
+ 
+ 	m_oDialog.Hide();
+ 	m_bFocusedElementBloated = TFALSE;
+@@ -268,7 +283,11 @@
+ {
+ 	for ( TINT i = 0; i < FRONTENDBUTTON_NUMOF; i++ )
+ 	{
+-		m_aButtons[ i ].SetText( g_pLocaleManager->GetString( FRONTENDBUTTON_TEXTS[ i ] ), TTRUE );
++#ifdef TOSHI_SKU_LINUX
++        if(i==FRONTENDBUTTON_ABOUT)m_aButtons[i].SetText(BarnyardLinux::NativePreferences().indonesian?L"Tentang":L"About",TTRUE);
++        else
++#endif
++        m_aButtons[i].SetText(g_pLocaleManager->GetString(FRONTENDBUTTON_TEXTS[i]),TTRUE);
+ 		m_aButtons[ i ].ResizeImage( 1.25f, 1.5f );
+ 	}
+ 
+@@ -284,6 +303,9 @@
+ 		fMenuWidth = 384.0f;
+ 
+ 	m_oDialog.SetDialogSize( fMenuWidth + 128.0f, fMenuHeight + 128.0f );
++#ifdef TOSHI_SKU_LINUX
++    FitNativeMenu();
++#endif
+ }
+ 
+ #endif // BARNYARD_COMMUNITY_PATCH
+@@ -423,6 +445,11 @@
+ 			pPushGameState = pSaveLoad;
+ 			break;
+ 		}
++#ifdef TOSHI_SKU_LINUX
++        case FRONTENDBUTTON_ABOUT:
++            pPushGameState=new ANativeAboutState();
++            break;
++#endif
+ 		case FRONTENDBUTTON_OPTIONS:
+ 			pPushGameState = new AOptionsState();
+ 			break;
+@@ -491,3 +518,14 @@
+ 
+ 	return TFALSE;
+ }
++
++#ifdef TOSHI_SKU_LINUX
++void AFrontEndMainMenuState2::FitNativeMenu() {
++    TFLOAT width,height,rootWidth,rootHeight;
++    m_oMenu.GetDimensions(width,height);
++    AGUI2::GetRootElement()->GetDimensions(rootWidth,rootHeight);
++    TFLOAT scale=TMath::Min(1.0f,TMath::Min((rootHeight-112.0f)/TMath::Max(height,1.0f),(rootWidth-64.0f)/TMath::Max(width,1.0f)));
++    m_oMenu.SetTransform(0.0f,30.0f);
++    m_oMenu.GetTransform().SetScale(scale,scale);
++}
++#endif

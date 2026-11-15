@@ -1,0 +1,20 @@
+INDONESIAN TEXT OVERLAY — COMMUNITY EXPERIMENTAL DRAFT
+
+The Indonesian overlay was produced locally using Helsinki-NLP OPUS-MT en-id
+(2019-12-18) through CTranslate2 int8 CPU inference and SentencePiece, with
+additional manually authored menu/common-word terminology. It is not an
+official THQ/Nickelodeon/Pandemic localization and has not had complete human
+contextual review. Names, trademarks and song titles may remain unchanged.
+
+Model/card: https://huggingface.co/Helsinki-NLP/opus-mt-en-id
+Original model: https://object.pouta.csc.fi/OPUS-MT-models/en-id/opus-2019-12-18.zip
+Model license: Apache License 2.0; see OPUS-MT-APACHE-2.0.txt.
+OPUS-MT: J. Tiedemann and S. Thottingal, "OPUS-MT — Building open translation
+services for the World", EAMT 2020.
+
+The inference model, CTranslate2, SentencePiece, original English locale
+catalogs and original game TRB/audio/image assets are not included in the
+installed package. Indonesian UTF-16 strings are compiled into the runtime,
+indexed by hashes of original text; owned PC game data remains necessary.
+Original voice/audio assets and backing English UK asset paths are unchanged.
+Engine source remains subject to the upstream non-commercial license.

@@ -1,0 +1,16 @@
+--- a/OpenBarnyard/Source/Assets/AMaterialLibrary.h
++++ b/OpenBarnyard/Source/Assets/AMaterialLibrary.h
+@@ -65,7 +65,13 @@
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ public:
+ 	// Console render.texture_overrides: textures in Data\Textures replace the ones of the libraries loaded next
++	#ifdef TOSHI_SKU_LINUX
++	// Retail textures are already embedded in TTL libraries. Optional loose
++	// replacement textures are opt-in; absence must not flood startup logs.
++	inline static TINT ms_iTextureOverrides = 0;
++#else
+ 	inline static TINT ms_iTextureOverrides = 1;
++#endif
+ #endif
+ 
+ private:

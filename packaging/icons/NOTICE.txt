@@ -1,0 +1,11 @@
+BARNYARD LINUX COMMUNITY APPLICATION ICON
+
+Original fan-made application artwork created with AI assistance for this
+community package: rustic BARNYARD / LINUX lettering, a farm and penguin motif.
+It is not extracted from the game and is not an official THQ/Nickelodeon logo.
+It does not imply endorsement by original game owners or Linux organizations.
+
+Only application/menu/taskbar/dialog icons are changed. Original in-game title
+artwork and all original game assets remain in the user's owned installation.
+The Linux port credit remains Katon Bagaskoro; original game and OpenBarnyard/
+Toshi decompilation credits and licenses remain intact.

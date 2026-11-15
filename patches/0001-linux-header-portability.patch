@@ -1,0 +1,129 @@
+diff --git a/Toshi/Source/Math/TMathInline.h b/Toshi/Source/Math/TMathInline.h
+index 7ab675a..8d1fd20 100644
+--- a/Toshi/Source/Math/TMathInline.h
++++ b/Toshi/Source/Math/TMathInline.h
+@@ -6,6 +6,11 @@
+ #include <cfloat>
+ #include <cmath>
+ 
++// glibc defines MAXFLOAT as a macro, conflicting with the engine constant.
++#ifdef MAXFLOAT
++#  undef MAXFLOAT
++#endif
++
+ TOSHI_NAMESPACE_START
+ 
+ namespace TMath
+@@ -39,7 +44,7 @@ constexpr TFLOAT HALF_PI          = PI / 2;
+ constexpr TFLOAT ONEOVER_SQRT_TWO = 0.70710677f;
+ constexpr TFLOAT ONEOVERTWO_PI    = 1 / TWO_PI;
+ 
+-TFORCEINLINE TBOOL  IsFinite( TFLOAT fVal ) { return _finite( fVal ) != 0; }
++TFORCEINLINE TBOOL  IsFinite( TFLOAT fVal ) { return std::isfinite( fVal ); }
+ TFORCEINLINE TFLOAT Sin( TFLOAT fVal ) { return sinf( fVal ); }
+ TFORCEINLINE TFLOAT Cos( TFLOAT fVal ) { return cosf( fVal ); }
+ TFORCEINLINE TFLOAT Tan( TFLOAT fVal ) { return tanf( fVal ); }
+@@ -117,7 +122,7 @@ TFORCEINLINE TINT CeilToInt( TFLOAT a_fVal ) { return TINT( ceilf( a_fVal ) ); }
+ // NOTE: the original rounds with fist and then subtracts one if the difference is negative (compares the float's bits)
+ TFORCEINLINE TINT FloorToInt( TFLOAT a_fVal ) { return TINT( floorf( a_fVal ) ); }
+ 
+-TFORCEINLINE TBOOL IsNaN( TFLOAT fVal ) { return isnan( fVal ); }
++TFORCEINLINE TBOOL IsNaN( TFLOAT fVal ) { return std::isnan( fVal ); }
+ 
+ TFORCEINLINE TINT FastMod( TINT a_iNum, TINT a_iModulus )
+ {
+diff --git a/Toshi/Source/Thread/T2Atomic.h b/Toshi/Source/Thread/T2Atomic.h
+index 1130dd9..fa848d2 100644
+--- a/Toshi/Source/Thread/T2Atomic.h
++++ b/Toshi/Source/Thread/T2Atomic.h
+@@ -7,3 +7,7 @@
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/T2Atomic_WASM.h"
+ #endif
++
++#ifdef TOSHI_SKU_LINUX
++#  include "Platform/Linux/T2Atomic_Linux.h"
++#endif
+diff --git a/Toshi/Source/Toshi/Defines.h b/Toshi/Source/Toshi/Defines.h
+index e036ef3..c5ce699 100644
+--- a/Toshi/Source/Toshi/Defines.h
++++ b/Toshi/Source/Toshi/Defines.h
+@@ -81,8 +81,16 @@
+ #define TOFFSETOF( CLASS, MEMBER )        offsetof( CLASS, MEMBER )
+ #define TALIGNAS( VALUE )                 alignas( VALUE )
+ #define TINLINE                           inline
++#if defined( TOSHI_SKU_LINUX )
++#  define __stdcall
++#  define __cdecl
++#  define __CRTDECL
++#  define TFORCEINLINE inline __attribute__((always_inline))
++#  define TNOINLINE __attribute__((noinline))
++#else
+ #define TFORCEINLINE                      __forceinline
+ #define TNOINLINE                         __declspec( noinline )
++#endif
+ #ifdef TOSHI_SKU_WASM
+ #  define TNODISCARD
+ #else
+@@ -157,7 +165,9 @@
+ 			  TWARN( "%s is not implemented: %s\n", __FUNCTION__, DESC ); \
+ 		  }                                                               \
+ 	  }
+-#  ifdef TOSHI_SKU_WASM
++#  if defined( TOSHI_SKU_LINUX )
++#    define TASSERT(X, ...) do { if (!(X)) { if (1 == TDebug_AssertHandler(#X, __FILE__, __LINE__ __VA_OPT__(,) __VA_ARGS__)) __builtin_trap(); } } while (false)
++#  elif defined( TOSHI_SKU_WASM )
+ #	define TASSERT( X, ... )                                                         \
+ 		{                                                                             \
+ 			TCALL_ONCE_IF( !( X ) )                                                   \
+diff --git a/Toshi/Source/Toshi/Endianness.h b/Toshi/Source/Toshi/Endianness.h
+index 0127bda..9da670d 100644
+--- a/Toshi/Source/Toshi/Endianness.h
++++ b/Toshi/Source/Toshi/Endianness.h
+@@ -10,7 +10,7 @@ enum Endianess_ : Endianess
+ };
+ 
+ inline constexpr Endianess CURRENT_ENDIANESS =
+-#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX )
+     Endianess_Little;
+ #endif
+ 
+diff --git a/Toshi/Source/Toshi/THPTimer.h b/Toshi/Source/Toshi/THPTimer.h
+index 98a9791..ebcb318 100644
+--- a/Toshi/Source/Toshi/THPTimer.h
++++ b/Toshi/Source/Toshi/THPTimer.h
+@@ -7,3 +7,7 @@
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/THPTimer_WASM.h"
+ #endif
++
++#ifdef TOSHI_SKU_LINUX
++#  include "Platform/Linux/THPTimer_Linux.h"
++#endif
+diff --git a/Toshi/Source/Toshi/Typedefs.h b/Toshi/Source/Toshi/Typedefs.h
+index 0152eed..4be4f4e 100644
+--- a/Toshi/Source/Toshi/Typedefs.h
++++ b/Toshi/Source/Toshi/Typedefs.h
+@@ -4,6 +4,8 @@
+ #  include "Platform/WASM/TTypes_WASM.h"
+ #endif
+ #include <cstdint>
++#include <cstddef>
++#include <cstdarg>
+ 
+ using TFLOAT   = float;
+ using TDOUBLE  = double;
+diff --git a/Toshi/Source/Toshi/Verify.h b/Toshi/Source/Toshi/Verify.h
+index e9cfc57..da5eec1 100644
+--- a/Toshi/Source/Toshi/Verify.h
++++ b/Toshi/Source/Toshi/Verify.h
+@@ -15,6 +15,6 @@ TSTATICASSERT( sizeof( TUINT64 ) == 8 );
+ // x64 is not supported
+ //TSTATICASSERT( sizeof( void* ) == 4 );
+ 
+-#if !defined( TOSHI_SKU_WINDOWS ) && !defined( TOSHI_SKU_WASM )
+-#  error At the moment, Windows is the only supported OS
++#if !defined( TOSHI_SKU_WINDOWS ) && !defined( TOSHI_SKU_WASM ) && !defined( TOSHI_SKU_LINUX )
++#  error Unsupported platform SKU
+ #endif

@@ -1,0 +1,24 @@
+--- a/OpenBarnyard/Source/AppBoot.cpp
++++ b/OpenBarnyard/Source/AppBoot.cpp
+@@ -434,6 +434,21 @@
+         puts("PC data indicators found; full data compatibility/gameplay NOT verified.");
+         TFileManager::Destroy();return 0;
+     }
++    // The two indicator files above do not make a runnable installation.
++    // The model-loader constructor assumes MaterialProperties exists and can
++    // dereference null without this check. Reject partial sample roots BEFORE
++    // creating engine/GL state. This is not exhaustive or corruption validation.
++    for (const char* required : {"Data/Locale/eng-uk.trb",
++            "Data/Assets/lib_startup.trb", "Data/lib_startup.trb",
++            "Data/MiscTextures/MaterialProperties.trb"}) {
++        TFile* file=TFile::Create(required);
++        const bool present=file && file->GetSize()>0;
++        if(file) file->Destroy();
++        if(!present) {
++            fprintf(stderr,"Barnyard: incomplete PC installation; missing/empty startup asset: %s\n",required);
++            TFileManager::Destroy();return 3;
++        }
++    }
+     BarnyardLinux::InstanceLock instanceLock;
+     if (!BarnyardLinux::hasArgument(argc, argv, "-multiinstance")) {
+         auto result = instanceLock.acquire(getenv("BARNYARD_USER_DIR"));

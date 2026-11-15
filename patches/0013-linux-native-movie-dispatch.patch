@@ -1,0 +1,192 @@
+--- a/OpenBarnyard/Source/Movie/ABINKMoviePlayer.cpp
++++ b/OpenBarnyard/Source/Movie/ABINKMoviePlayer.cpp
+@@ -8,6 +8,9 @@
+ #include <Render/TTextureFactory.h>
+ 
+ #include <fmod/fmod.h>
++#ifdef TOSHI_SKU_LINUX
++#include <File/TFile.h>
++#endif
+ 
+ //-----------------------------------------------------------------------------
+ // Enables memory debugging.
+@@ -24,6 +27,9 @@
+ // $Barnyard: FUNCTION 00605ce0
+ ABINKMoviePlayer::~ABINKMoviePlayer()
+ {
++#ifdef TOSHI_SKU_LINUX
++    StopMovie();
++#endif
+ }
+ 
+ ABINKMoviePlayer::ABINKMoviePlayer()
+@@ -34,17 +40,24 @@
+ 	m_bVisible  = TFALSE;
+ 	m_pSurface  = TNULL;
+ 	m_iNumRects = 0;
++	m_pRects = TNULL;
+ }
+ 
+ // $Barnyard: FUNCTION 00605830
++#ifndef TOSHI_SKU_LINUX
+ static void* RADLINK BinkAlloc( U32 a_uiSize )
+ {
+ 	return TMalloc( a_uiSize );
+ }
++
++#endif
+ 
+ // $Barnyard: FUNCTION 00605890
+ TBOOL ABINKMoviePlayer::OnCreate()
+ {
++#ifdef TOSHI_SKU_LINUX
++    return AMoviePlayer::OnCreate();
++#else
+ 	BinkSetMemory(
+ 	    BinkAlloc,
+ 	    []( void* ptr ) {
+@@ -69,6 +82,7 @@
+ 	}
+ 
+ 	return TTRUE;
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 006061f0
+@@ -79,12 +93,22 @@
+ 		return TTRUE;
+ 	}
+ 
+-	if ( m_Bink->LastFrameNum == m_Bink->Frames )
++	if (
++#ifdef TOSHI_SKU_LINUX
++        NativeMovieFinished(m_Bink)
++#else
++        m_Bink->LastFrameNum == m_Bink->Frames
++#endif
++    )
+ 	{
+ 		StopMovie();
+ 		return TTRUE;
+ 	}
+ 
++#ifdef TOSHI_SKU_LINUX
++    NativeMovieSystemPause(m_Bink,g_oSystemManager.IsPaused());
++    m_bPaused=NativeMoviePaused(m_Bink);
++#else
+ 	if ( g_oSystemManager.IsPaused() )
+ 	{
+ 		if ( !m_bPaused )
+@@ -104,11 +128,22 @@
+ 		}
+ 	}
+ 
++#endif
++
+ 	auto iWaitRes = BinkWait( m_Bink );
+ 
+ 	if ( iWaitRes == 0 )
+ 	{
+-		if ( BinkDoFrame( m_Bink ) == 0 )
++        const int decodeResult = BinkDoFrame(m_Bink);
++#ifdef TOSHI_SKU_LINUX
++        if (decodeResult < 0)
++        {
++            TWARN("Movie decode failed: %s\n", NativeMovieError());
++            StopMovie();
++            return TTRUE;
++        }
++#endif
++		if ( decodeResult == 0 )
+ 		{
+ 			if ( !m_bVideoFitsBackBuffer || !m_pSurface )
+ 			{
+@@ -168,6 +203,18 @@
+ 				}
+ 			}
+ #elif defined( TRENDERINTERFACE_GL )
++#ifdef TOSHI_SKU_LINUX
++            for (TINT i=0; i<m_iNumRects; ++i)
++            {
++                auto& rect=m_pRects[i];
++                TTexture::LOCKSTATE lock;
++                if (rect.pTexture->Lock(lock))
++                {
++                    BinkCopyToBuffer(m_Bink, lock.pBits, lock.Pitch, rect.iHeight, rect.iPosX, rect.iPosY, m_eFormat);
++                    rect.pTexture->Unlock();
++                }
++            }
++#else
+ 			TTexture::LOCKSTATE oLockState;
+ 
+ 			if ( m_pRects[ 0 ].pTexture->Lock( oLockState ) )
+@@ -177,6 +224,7 @@
+ 				m_pRects[ 0 ].pTexture->Unlock();
+ 			}
+ #endif
++#endif
+ 		}
+ 
+ 		BinkNextFrame( m_Bink );
+@@ -188,6 +236,10 @@
+ 
+ void ABINKMoviePlayer::OnDestroy()
+ {
++#ifdef TOSHI_SKU_LINUX
++    StopMovie();
++    AMoviePlayer::OnDestroy();
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 00606180
+@@ -197,6 +249,17 @@
+ 
+ 	SetMovieFile( a_szFileName );
+ 
++#ifdef TOSHI_SKU_LINUX
++    StopMovie();
++    const char* args = TUtil::GetToshiParameters().szCommandLine;
++    NativeMovieMute(args && (T2String8::FindString(args, "-mute") || T2String8::FindString(args, "-background")));
++    TFile* file = TFile::Create(m_szMoviePath);
++    if (!file) return TFALSE;
++    TString8 nativePath = file->GetFileSystem()->MakeInternalPath(m_szMoviePath);
++    file->Destroy();
++    m_Bink = BinkOpen(nativePath.GetString(), 0);
++    if (!m_Bink) TWARN("Cannot open movie: %s\n", NativeMovieError());
++#else
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	// Dev switches: "-background" (and "-mute") runs open movies without their sound tracks
+ 	if ( T2String8::FindString( GetCommandLineA(), "-background" ) || T2String8::FindString( GetCommandLineA(), "-mute" ) )
+@@ -204,6 +267,8 @@
+ #endif
+ 
+ 	m_Bink = BinkOpen( m_szMoviePath, 0 );
++
++#endif
+ 
+ 	if ( m_Bink != TNULL )
+ 	{
+@@ -354,6 +419,9 @@
+ // $Barnyard: FUNCTION 00605860
+ void ABINKMoviePlayer::PauseMovie( TBOOL a_bPause )
+ {
++#ifdef TOSHI_SKU_LINUX
++    BinkPause(m_Bink, a_bPause);
++#endif
+ 	m_bPaused = a_bPause;
+ }
+ 
+--- a/OpenBarnyard/Source/Movie/ABINKMoviePlayer.h
++++ b/OpenBarnyard/Source/Movie/ABINKMoviePlayer.h
+@@ -6,10 +6,7 @@
+ #include "Render/TBackend.h"
+ 
+ #ifdef TOSHI_SKU_LINUX
+-// Only a handle is stored here. Keep the Windows SDK out of public game headers;
+-// a Linux codec implementation is still required by the movie implementation.
+-struct BINK;
+-using HBINK = BINK*;
++#include "Platform/Linux/NativeMovie.h"
+ #else
+ #include <bink.h>
+ #endif

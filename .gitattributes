@@ -1,0 +1,8 @@
+* text=auto eol=lf
+# Ordered patch context and original license notices must retain exact bytes.
+*.patch -text
+third_party/* -text
+launcher/LICENSE-MIT -text
+LICENSE-GPL-3.0.txt -text
+*.png binary
+*.bmp binary

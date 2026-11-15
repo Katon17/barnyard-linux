@@ -1,0 +1,74 @@
+diff --git a/Toshi/Source/Thread/T2AtomicMutex.cpp b/Toshi/Source/Thread/T2AtomicMutex.cpp
+index 2d2d359..a46c390 100644
+--- a/Toshi/Source/Thread/T2AtomicMutex.cpp
++++ b/Toshi/Source/Thread/T2AtomicMutex.cpp
+@@ -21,7 +21,11 @@ void T2AtomicMutex::Lock()
+ {
+ 	TUINT32 uiActiveThread = GetCurrentThreadId();
+ 
+-	if ( m_uiLockedThread == uiActiveThread )
++	#ifdef TOSHI_SKU_LINUX
++    if ( __atomic_load_n( &m_uiLockedThread, __ATOMIC_ACQUIRE ) == uiActiveThread )
++#else
++    if ( m_uiLockedThread == uiActiveThread )
++#endif
+ 	{
+ 		// Don't lock in case some other lock is already made by this thread to avoid deadlocks
+ 		m_uiThreadDepth += 1;
+@@ -37,7 +41,11 @@ TryLocking:
+ 	if ( ( iStateBeforeTry & STATEFLAG_LOCKED ) == 0 )
+ 	{
+ 		// Locked! Can safely leave this function
+-		m_uiLockedThread = uiActiveThread;
++		#ifdef TOSHI_SKU_LINUX
++        __atomic_store_n( &m_uiLockedThread, uiActiveThread, __ATOMIC_RELEASE );
++#else
++        m_uiLockedThread = uiActiveThread;
++#endif
+ 		m_uiThreadDepth  = 1;
+ 		return;
+ 	}
+@@ -77,7 +85,11 @@ TBOOL T2AtomicMutex::TryLock()
+ {
+ 	TUINT32 uiActiveThread = GetCurrentThreadId();
+ 
+-	if ( m_uiLockedThread == uiActiveThread )
++	#ifdef TOSHI_SKU_LINUX
++    if ( __atomic_load_n( &m_uiLockedThread, __ATOMIC_ACQUIRE ) == uiActiveThread )
++#else
++    if ( m_uiLockedThread == uiActiveThread )
++#endif
+ 	{
+ 		m_uiThreadDepth += 1;
+ 		return TTRUE;
+@@ -88,7 +100,11 @@ TBOOL T2AtomicMutex::TryLock()
+ 
+ 	if ( ( m_iState.Or( STATEFLAG_LOCKED ) & STATEFLAG_LOCKED ) == 0 )
+ 	{
+-		m_uiLockedThread = uiActiveThread;
++		#ifdef TOSHI_SKU_LINUX
++        __atomic_store_n( &m_uiLockedThread, uiActiveThread, __ATOMIC_RELEASE );
++#else
++        m_uiLockedThread = uiActiveThread;
++#endif
+ 		m_uiThreadDepth  = 1;
+ 		return TTRUE;
+ 	}
+@@ -105,8 +121,15 @@ void T2AtomicMutex::Unlock()
+ 		constexpr TINT ONE_LOCK_FLAGS = STATEFLAG_LOCKED | GET_STATEFLAG_NUM_WAITS( 1 );
+ 
+ 		// Mark as unused and remove one wait from the total count
+-		TINT iOldState   = m_iState.Add( -ONE_LOCK_FLAGS );
+-		m_uiLockedThread = 0;
++		// Clear ownership BEFORE publishing an unlocked state. Clearing after
++        // Add lets another thread acquire the mutex and then lose its owner id.
++#ifdef TOSHI_SKU_LINUX
++        __atomic_store_n( &m_uiLockedThread, TUINT32(0), __ATOMIC_RELEASE );
++        TINT iOldState = m_iState.Add( -ONE_LOCK_FLAGS );
++#else
++        TINT iOldState = m_iState.Add( -ONE_LOCK_FLAGS );
++        m_uiLockedThread = 0;
++#endif
+ 
+ 		// Signal only when there's some thread waiting for this mutex to be unlocked to avoid unnecessary kernel calls
+ 		if ( iOldState != ONE_LOCK_FLAGS ) m_iState.Signal();

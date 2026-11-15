@@ -1,0 +1,101 @@
+diff --git a/OpenBarnyard/Source/AOptions.cpp b/OpenBarnyard/Source/AOptions.cpp
+index ce6107e..735889b 100644
+--- a/OpenBarnyard/Source/AOptions.cpp
++++ b/OpenBarnyard/Source/AOptions.cpp
+@@ -18,7 +18,11 @@
+ #  include <direct.h>
+ #endif // BARNYARD_LATEST
+ 
++#ifdef TOSHI_SKU_WINDOWS
+ #include <windows.h>
++#elif defined(TOSHI_SKU_LINUX)
++#include "Platform/Linux/NativeOptions.h"
++#endif
+ 
+ //-----------------------------------------------------------------------------
+ // Enables memory debugging.
+@@ -141,6 +145,19 @@ void AOptions::LoadSettings()
+ #endif
+ 	m_bForcedWindowed    = TFALSE;
+ 
++#ifdef TOSHI_SKU_LINUX
++    BarnyardLinux::NativeOptions native;
++    std::string error;
++    if (native.load(error)==BarnyardLinux::NativeOptions::LoadResult::Invalid)
++        fprintf(stderr,"Barnyard: Settings/Linux.cfg rejected: %s\n",error.c_str());
++    m_iWidth=native.width; m_iHeight=native.height;
++    m_fGamma=native.gamma; m_fSensitivity=native.sensitivity;
++    m_bForcedWindowed=native.windowed; m_bHighDetailGrass=native.highDetailGrass;
++    m_bControllerEnabled=native.controller;
++#ifdef BARNYARD_COMMUNITY_PATCH
++    ms_bBorderless=native.borderless;
++#endif
++#else
+ 	HKEY hKey;
+ 
+ 	if ( ERROR_SUCCESS == RegOpenKeyExA( HKEY_CURRENT_USER, "Software\\THQ\\Barnyard", 0, KEY_READ, &hKey ) )
+@@ -229,6 +246,7 @@ void AOptions::LoadSettings()
+ 			m_bControllerEnabled = dwData != FALSE;
+ 		}
+ 	}
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 00662d90
+@@ -292,6 +310,10 @@ void AOptions::SetLanguage( T2Locale::Lang a_eLanguage )
+ 
+ TBOOL AOptions::IsWindowed() const
+ {
++#ifdef TOSHI_SKU_LINUX
++    const auto* commandLine = TUtil::GetToshiParameters().szCommandLine;
++    return m_bForcedWindowed || (commandLine && strstr(commandLine, "\"-windowed\""));
++#else
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	// Allow forcing the windowed mode from the command line
+ 	if ( TStringManager::String8FindString( GetCommandLineA(), "-windowed" ) )
+@@ -303,6 +325,7 @@ TBOOL AOptions::IsWindowed() const
+ #endif
+ 
+ 	return IsDebuggerPresent() || m_bForcedWindowed;
++#endif
+ }
+ 
+ #ifdef BARNYARD_LATEST
+diff --git a/OpenBarnyard/Source/Movie/ABINKMoviePlayer.h b/OpenBarnyard/Source/Movie/ABINKMoviePlayer.h
+index 8d55d65..90c6abf 100644
+--- a/OpenBarnyard/Source/Movie/ABINKMoviePlayer.h
++++ b/OpenBarnyard/Source/Movie/ABINKMoviePlayer.h
+@@ -5,7 +5,14 @@
+ 
+ #include "Render/TBackend.h"
+ 
++#ifdef TOSHI_SKU_LINUX
++// Only a handle is stored here. Keep the Windows SDK out of public game headers;
++// a Linux codec implementation is still required by the movie implementation.
++struct BINK;
++using HBINK = BINK*;
++#else
+ #include <bink.h>
++#endif
+ 
+ class ABINKMoviePlayer : public AMoviePlayer
+ {
+diff --git a/OpenBarnyard/Source/Tasks/ARootTask.cpp b/OpenBarnyard/Source/Tasks/ARootTask.cpp
+index d4cdf7b..f57d262 100644
+--- a/OpenBarnyard/Source/Tasks/ARootTask.cpp
++++ b/OpenBarnyard/Source/Tasks/ARootTask.cpp
+@@ -350,7 +350,13 @@ void ARootTask::CreateStartupGameStates()
+ 	// Development: skip the startup screens when a minigame or the sim is requested on the command line
+ #  ifndef TOSHI_FINAL
+ 	if ( AGameLoader::Dev_IsMiniGameRequested() || AGameLoader::Dev_IsSimStateRequested() ||
+-	     TStringManager::String8FindString( GetCommandLineA(), "-devkeys " ) )
++	     TStringManager::String8FindString(
++#ifdef TOSHI_SKU_LINUX
++             TUtil::GetToshiParameters().szCommandLine,
++#else
++             GetCommandLineA(),
++#endif
++             "-devkeys " ) )
+ #  else
+ 	if ( AGameLoader::Dev_IsMiniGameRequested() || AGameLoader::Dev_IsSimStateRequested() )
+ #  endif

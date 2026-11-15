@@ -1,0 +1,184 @@
+--- a/OpenBarnyard/Source/GameInterface/AOptionsState.h
++++ b/OpenBarnyard/Source/GameInterface/AOptionsState.h
+@@ -14,6 +14,7 @@
+ #ifdef TOSHI_SKU_LINUX
+         OPTIONSBUTTON_DISPLAY,
+         OPTIONSBUTTON_LANGUAGE,
++        OPTIONSBUTTON_FPS,
+         OPTIONSBUTTON_ABOUT,
+ #endif
+ #ifdef BARNYARD_LATEST
+@@ -29,7 +30,7 @@
+ 		282,
+ 		281,
+ #ifdef TOSHI_SKU_LINUX
+-        -1, -1, -1, // Native display/language labels, not retail locale IDs.
++        -1, -1, -1, -1, // Native display/language labels, not retail locale IDs.
+ #endif
+ #ifdef BARNYARD_LATEST
+ 		3482, // ACameraOptionsState::CAMERA_SPEED_TEXT (the button shows ACameraOptionsState::GetCameraText)
+--- a/OpenBarnyard/Source/GameInterface/AOptionsState.cpp
++++ b/OpenBarnyard/Source/GameInterface/AOptionsState.cpp
+@@ -3,6 +3,7 @@
+ #ifdef TOSHI_SKU_LINUX
+ #include "Platform/Linux/NativePreferences.h"
+ #include "Platform/Linux/ANativeAboutState.h"
++#include "GUI/AGUI2.h"
+ #include "Render/ARenderer.h"
+ #include "Render/ABackend.h"
+ #include "AFrontEndMainMenuState2.h"
+@@ -60,6 +61,10 @@
+ {
+ #ifdef TOSHI_SKU_LINUX
+     bool id=BarnyardLinux::NativePreferences().indonesian;
++    if(a_iButton==OPTIONSBUTTON_FPS) {
++        bool shown=BarnyardLinux::NativePreferences().showFPS;
++        return id?(shown?L"FPS: Aktif":L"FPS: Nonaktif"):(shown?L"FPS: On":L"FPS: Off");
++    }
+     if(a_iButton==OPTIONSBUTTON_ABOUT)return id?L"Tentang":L"About";
+     if(a_iButton==OPTIONSBUTTON_DISPLAY) {
+         bool full=!TRenderInterfaceHAL::Interface()->GetCurrentDisplayParams()->bWindowed;
+@@ -136,6 +141,16 @@
+ 	AGUI2Button* pButton = TSTATICCAST( AGUI2Button, a_pMenuItem );
+ 	m_iActivatedButtonID = pButton->GetId();
+ #ifdef TOSHI_SKU_LINUX
++    if(m_iActivatedButtonID==OPTIONSBUTTON_FPS) {
++        auto prefs=BarnyardLinux::NativePreferences();prefs.showFPS=!prefs.showFPS;
++        if(BarnyardLinux::StoreNativePreferences(prefs)) {
++            if(AGUI2::IsSingletonCreated())AGUI2::GetSingleton()->SetNativeFPSVisible(prefs.showFPS);
++        } else {
++            fprintf(stderr,"FPS preference save failed: %s\n",BarnyardLinux::PreferencesError().c_str());
++            ASoundManager::GetSingleton()->PlayCue(soundbank::UI_NEGATIVE);
++        }
++        UpdateTexts();m_iActivatedButtonID=-1;return;
++    }
+     if(m_iActivatedButtonID==OPTIONSBUTTON_DISPLAY) {
+         auto* renderer=TRenderInterfaceHAL::Interface();
+         bool full=!renderer->GetCurrentDisplayParams()->bWindowed;
+--- a/OpenBarnyard/Source/GUI/AGUI2.h
++++ b/OpenBarnyard/Source/GUI/AGUI2.h
+@@ -10,6 +10,9 @@
+ #include <GUI/T2GUITextureSection.h>
+ 
+ #include <Toshi/TTask.h>
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativeFPSCounter.h"
++#endif
+ 
+ #ifdef BARNYARD_LATEST
+ #  include "GUI/XUI/AGUI2XUI.h"
+@@ -46,6 +49,13 @@
+ 
+ 	void GetDimensions( TFLOAT& a_rWidth, TFLOAT& a_rHeight );
+ 
++#ifdef TOSHI_SKU_LINUX
++    void SetNativeFPSVisible(TBOOL visible);
++private:
++    void UpdateNativeFPS();
++    BarnyardLinux::FPSCounter m_nativeFPSCounter;
++public:
++#endif
+ 	TBOOL IsCursorVisible() const { return m_bShowMouseCursor; }
+ 	void  SetCursorVisible( TBOOL a_bVisible ) { m_bShowMouseCursor = a_bVisible; }
+ 
+--- a/OpenBarnyard/Source/GUI/AGUI2.cpp
++++ b/OpenBarnyard/Source/GUI/AGUI2.cpp
+@@ -1,5 +1,9 @@
+ #include "pch.h"
+ #include "AGUI2.h"
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativePreferences.h"
++#include <SDL2/SDL.h>
++#endif
+ #include "Assets/AAssetLoader.h"
+ #include "Assets/AMaterialLibraryManager.h"
+ #include "Cameras/ACameraManager.h"
+@@ -87,6 +91,10 @@
+ 		m_pRootElement->SetDimensions( 600.0f * fAspectRatio, 600.0f );
+ 	else
+ 		m_pRootElement->SetDimensions( 800.0f, 800.0f / fAspectRatio );
++#ifdef TOSHI_SKU_LINUX
++    // Debug canvas is rendered separately; keep it aligned with the logical root.
++    T2GUI::GetContext()->GetDebugCanvas()->SetDimensions(m_pRootElement->GetWidth(),m_pRootElement->GetHeight());
++#endif
+ }
+ 
+ #endif // BARNYARD_COMMUNITY_PATCH
+@@ -116,10 +124,21 @@
+ 	m_oFPS.Create( pFont, 600.0f );
+ 	m_oFPS.SetAttachment( T2GUIATTACHMENT_TOPLEFT, T2GUIATTACHMENT_TOPLEFT );
+ 	m_oFPS.SetTextAlign( T2GUIFont::TextAlign_Left );
++#ifdef TOSHI_SKU_LINUX
++    m_oFPS.SetWidth(180.0f);
++    m_oFPS.SetTransform(12.0f,12.0f);
++    m_oFPS.SetShadow(TTRUE,0xff000000);
++    m_oFPS.SetShadowOffset(2.0f,2.0f);
++#else
+ 	m_oFPS.SetTransform( 0.0f, 0.0f );
+-
++#endif
++
++#ifdef TOSHI_SKU_LINUX
++    SetNativeFPSVisible(BarnyardLinux::NativePreferences().showFPS);
++#else
+ 	if ( m_bShowFPSInfo ) m_oFPS.Show();
+ 	else m_oFPS.Hide();
++#endif
+ 	pDebugCanvas->AddChildTail( m_oFPS );
+ 
+ 	// Player stats
+@@ -264,6 +283,7 @@
+ 		}
+ 	}
+ 
++#ifndef TOSHI_SKU_LINUX
+ 	if ( m_bShowFPSInfo )
+ 	{
+ 		static TFLOAT s_FPS         = 0.0f;
+@@ -294,6 +314,8 @@
+ 			m_oFPS.SetColour( 0xffff0000 );
+ 		}
+ 	}
++
++#endif // Linux FPS counts actual rendered GUI frames instead.
+ 
+ 	if ( m_bShowPlayerInfo )
+ 	{
+@@ -436,6 +458,9 @@
+ // $Barnyard: FUNCTION 00635410
+ void AGUI2::MainPostRenderCallback()
+ {
++#ifdef TOSHI_SKU_LINUX
++    GetSingleton()->UpdateNativeFPS();
++#endif
+ 	FIRE_EVENT( AGUI2::PostRender );
+ 
+ #ifdef TOSHI_SKU_WASM
+@@ -633,3 +658,27 @@
+ #  endif // BARNYARD_COMMUNITY_PATCH
+ 
+ #endif // BARNYARD_LATEST
++
++#ifdef TOSHI_SKU_LINUX
++void AGUI2::SetNativeFPSVisible(TBOOL visible) {
++    m_bShowFPSInfo=visible;
++    m_nativeFPSCounter.reset();
++    m_oFPS.SetColour(0xffffffff);
++    m_oFPS.SetText(L"FPS: --");
++    if(visible)m_oFPS.Show();else m_oFPS.Hide();
++}
++void AGUI2::UpdateNativeFPS() {
++    if(!m_bShowFPSInfo)return;
++    const auto frequency=SDL_GetPerformanceFrequency();
++    if(!frequency)return;
++    if(m_nativeFPSCounter.frame(double(SDL_GetPerformanceCounter())/double(frequency))) {
++        const double fps=m_nativeFPSCounter.fps();
++        TStringManager::String16Format(m_wszFPS,TARRAYSIZE(m_wszFPS),L"FPS: %0.1f",fps);
++        m_oFPS.SetText(m_wszFPS);
++        m_oFPS.SetColour(fps<15.0?0xffff0000:(fps<20.0?0xffffff00:0xffffffff));
++    } else if(!m_nativeFPSCounter.hasSample()) {
++        m_oFPS.SetColour(0xffffffff);
++        m_oFPS.SetText(L"FPS: --");
++    }
++}
++#endif

@@ -1,0 +1,1 @@
+PASS: package rename test6 -> 1.0.0 preserved 3 legacy fixture files byte-for-byte (remembered game root, FPS-enabled native preferences, fake save sentinel; not a real save/reload test).

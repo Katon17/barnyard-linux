@@ -1,0 +1,66 @@
+diff --git a/Toshi/Source/File/TFileStream.cpp b/Toshi/Source/File/TFileStream.cpp
+index cd8dec6..5dafa40 100644
+--- a/Toshi/Source/File/TFileStream.cpp
++++ b/Toshi/Source/File/TFileStream.cpp
+@@ -18,6 +18,9 @@ TFileStream::TFileStream()
+ // $Barnyard: FUNCTION 006d7fb0
+ TFileStream::~TFileStream()
+ {
++#ifdef TOSHI_SKU_LINUX
++	Stop();
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 006d7f30
+@@ -58,7 +61,12 @@ void TFileStream::Stop()
+ 	if ( m_hThreadHnd == TNULL )
+ 		return;
+ 
+-#ifdef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_LINUX
++	TFileStreamJob* pStopJob = TNULL;
++	m_Jobs.Push(&pStopJob);
++	Destroy(); // join before FIFO, jobs or allocator can be destroyed
++	return;
++#elif defined(TOSHI_SKU_WASM)
+ 	TFileStreamJob* pStopJob = TNULL;
+ 	m_Jobs.Push( &pStopJob );
+ 	return;
+diff --git a/Toshi/Source/File/TFileStream.h b/Toshi/Source/File/TFileStream.h
+index f04ce4a..3ddbd03 100644
+--- a/Toshi/Source/File/TFileStream.h
++++ b/Toshi/Source/File/TFileStream.h
+@@ -7,6 +7,9 @@
+ #include "Toshi/TFifo.h"
+ #include "Thread/TThread.h"
+ #include "File/TTRB.h"
++#ifdef TOSHI_SKU_LINUX
++# include <atomic>
++#endif
+ 
+ TOSHI_NAMESPACE_START
+ 
+@@ -29,7 +32,11 @@ public:
+ 
+ protected:
+ 	TSemaphore* m_pSemaphore;
++#ifdef TOSHI_SKU_LINUX
++	std::atomic<TBOOL> m_bIsProcessed;
++#else
+ 	TBOOL       m_bIsProcessed;
++#endif
+ };
+ 
+ class TFileStream : public TThread
+diff --git a/Toshi/Source/Thread/TThread.h b/Toshi/Source/Thread/TThread.h
+index 649d2f9..aca227c 100644
+--- a/Toshi/Source/Thread/TThread.h
++++ b/Toshi/Source/Thread/TThread.h
+@@ -18,3 +18,7 @@
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/TThread_WASM.h"
+ #endif
++
++#ifdef TOSHI_SKU_LINUX
++# include "Platform/Linux/TThread_Linux.h"
++#endif

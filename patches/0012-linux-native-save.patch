@@ -1,0 +1,178 @@
+--- a/OpenBarnyard/Source/GameInterface/SaveLoadSKU.cpp
++++ b/OpenBarnyard/Source/GameInterface/SaveLoadSKU.cpp
+@@ -6,9 +6,14 @@
+ 
+ #include <Toshi/TStringManager.h>
+ 
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativeSave.h"
++#include <cstdlib>
++#else
+ #include <windows.h>
+ #include <io.h>
+ #include <direct.h>
++#endif
+ #include <stdio.h>
+ 
+ //-----------------------------------------------------------------------------
+@@ -33,6 +38,12 @@
+ static constexpr TINT TEXT_SAVED       = 1467;
+ static constexpr TINT TEXT_SAVE_FAILED = 1468;
+ 
++#ifdef TOSHI_SKU_LINUX
++static BarnyardLinux::SaveStore NativeStore()
++{
++    return BarnyardLinux::SaveStore(getenv("BARNYARD_USER_DIR"), getenv("BARNYARD_GAME_DIR"));
++}
++#else
+ // Is a_szPath an existing directory (NOTE: _findfirst/_findclose in the original)
+ static TBOOL IsDirectory( const TCHAR* a_szPath, TBOOL& a_rExists )
+ {
+@@ -44,11 +55,28 @@
+ 	return a_rExists && ( oData.attrib & _A_SUBDIR );
+ }
+ 
++#endif
++
+ // $Barnyard: FUNCTION 00652a90
+ SaveLoadSKU::Step* SaveLoadSKU::CheckFileStep::Update( TFLOAT a_fDeltaTime )
+ {
+ 	m_pOwner->m_eResult = RESULT_SUCCESS;
+ 
++#ifdef TOSHI_SKU_LINUX
++    auto store = NativeStore();
++    const auto status = store.status(m_pOwner->m_szSavePath);
++    if (status == BarnyardLinux::SaveStore::Status::Missing)
++    {
++        delete this;
++        return TNULL;
++    }
++    if (status != BarnyardLinux::SaveStore::Status::Regular)
++    {
++        m_pOwner->m_eResult = RESULT_FAILED;
++        delete this;
++        return new MessageStep(TEXT_LOAD_FAILED);
++    }
++#else
+ 	TBOOL bExists;
+ 
+ 	if ( !IsDirectory( m_pOwner->m_szSaveDir, bExists ) )
+@@ -68,6 +96,7 @@
+ 		return new MessageStep( TEXT_LOAD_FAILED );
+ 	}
+ 
++#endif
+ 	delete this;
+ 	return new LoadStep();
+ }
+@@ -95,6 +124,12 @@
+ SaveLoadSKU::Step* SaveLoadSKU::LoadStep::Update( TFLOAT a_fDeltaTime )
+ {
+ 	APlayerProgress* pProgress = m_pOwner->m_pProgress;
++#ifdef TOSHI_SKU_LINUX
++    auto store = NativeStore();
++    const TBOOL bRead = store.readExact(m_pOwner->m_szSavePath, pProgress->GetSaveBuffer(), pProgress->GetSaveSize());
++    const TBOOL bLoaded = bRead && pProgress->Validate();
++    if (!bLoaded) pProgress->ClearAllSlots();
++#else
+ 	FILE*            pFile     = fopen( m_pOwner->m_szSavePath, "rb" );
+ 	TBOOL            bLoaded   = TFALSE;
+ 
+@@ -114,6 +149,8 @@
+ 		}
+ 	}
+ 
++#endif
++
+ 	if ( !bLoaded )
+ 	{
+ 		m_pOwner->m_eResult = RESULT_FAILED;
+@@ -134,6 +171,10 @@
+ {
+ 	APlayerProgress* pProgress = m_pOwner->m_pProgress;
+ 
++#ifdef TOSHI_SKU_LINUX
++    auto store = NativeStore();
++    const TBOOL bSaved = store.writeAtomic(m_pOwner->m_szSavePath, pProgress->GetSaveBuffer(), pProgress->GetSaveSize());
++#else
+ 	TBOOL bExists;
+ 	TBOOL bSaved = TFALSE;
+ 
+@@ -149,8 +190,11 @@
+ 		}
+ 	}
+ 
++#endif
++
+ 	if ( !bSaved )
+ 	{
++        m_pOwner->m_eResult = RESULT_FAILED;
+ 		delete this;
+ 		return new MessageStep( TEXT_SAVE_FAILED );
+ 	}
+@@ -186,12 +230,29 @@
+ 
+ 	// <exe directory>Save\savedata.by
+ 	strcpy( m_szSavePath, m_szSaveDir );
++#ifdef TOSHI_SKU_LINUX
++    // Keep retail member buffers, but reject rather than truncate an overlong path.
++    if (!m_szSaveDir[0] || strlen(m_szSaveDir) + 1 + strlen(s_szSaveFileName) >= sizeof(m_szSavePath))
++    {
++        m_szSavePath[0] = '\0';
++        m_eResult = RESULT_FAILED;
++        return;
++    }
++    strcat(m_szSavePath, "/");
++#else
+ 	strcat( m_szSavePath, "\\" );
++#endif
+ 	strcat( m_szSavePath, s_szSaveFileName );
+ 
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	if ( ms_szDevSavePath[ 0 ] != '\0' )
+ 	{
++#ifdef TOSHI_SKU_LINUX
++        if(strlen(ms_szDevSavePath)>=sizeof(m_szSaveDir))
++        {
++            m_szSavePath[0]='\0';m_eResult=RESULT_FAILED;return;
++        }
++#endif
+ 		// Development: save somewhere else
+ 		strcpy( m_szSavePath, ms_szDevSavePath );
+ 		strcpy( m_szSaveDir, ms_szDevSavePath );
+@@ -338,7 +399,7 @@
+ 
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 
+-#  ifndef TOSHI_SKU_WASM
++#  if !defined(TOSHI_SKU_WASM) && !defined(TOSHI_SKU_LINUX)
+ // Creates a_szDir and its missing parents
+ static TBOOL CreateDirectories( const TCHAR* a_szDir )
+ {
+@@ -379,6 +440,18 @@
+ 
+ const TCHAR* SaveLoadSKU::GetSaveDirectory()
+ {
++#ifdef TOSHI_SKU_LINUX
++    static TCHAR directory[259];
++    auto store = NativeStore();
++    const auto path = store.directory();
++    if (path.empty() || path.size() >= sizeof(directory))
++    {
++        directory[0] = '\0';
++        TWARN("Native save directory unavailable or too long\n");
++    }
++    else memcpy(directory, path.c_str(), path.size()+1);
++    return directory;
++#else
+ 	static TCHAR s_szDir[ MAX_PATH ];
+ 
+ 	if ( s_szDir[ 0 ] != '\0' )
+@@ -432,6 +505,7 @@
+ 	TStringManager::String8Copy( s_szDir, szVirtualDir, sizeof( s_szDir ) );
+ 	return s_szDir;
+ #  endif // !TOSHI_SKU_WASM
++#endif // TOSHI_SKU_LINUX
+ }
+ 
+ void SaveLoadSKU::Dev_SetSavePath( const TCHAR* a_szPath )

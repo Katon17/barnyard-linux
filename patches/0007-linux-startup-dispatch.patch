@@ -1,0 +1,449 @@
+diff --git a/OpenBarnyard/Source/AppBoot.cpp b/OpenBarnyard/Source/AppBoot.cpp
+index 22f6bf7..77c2729 100644
+--- a/OpenBarnyard/Source/AppBoot.cpp
++++ b/OpenBarnyard/Source/AppBoot.cpp
+@@ -15,6 +15,10 @@
+ 
+ #include "Render/TBackend.h"
+ 
++#ifdef TOSHI_SKU_LINUX
++# include "Platform/Linux/NativeStartup.h"
++# include <File/TFile.h>
++#endif
+ #include "AppBoot.h"
+ #include "ClassLink.h"
+ #include "Tasks/ADummyTask.h"
+@@ -23,7 +27,7 @@
+ #include "GUI/AGUI2.h"
+ #include "CVar/AVarType.h"
+ #include "Tasks/ARootTask.h"
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ #  include "Mod/AModLoader.h"
+ #endif
+ #include "Assets/AAssetLoader.h"
+@@ -42,7 +46,9 @@
+ // destructors (TClass, free lists of the engine...) rely on the memory being still there.
+ static int __cdecl InitialiseMemory()
+ {
+-#ifdef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_LINUX
++	return Toshi::TMemory::Initialise(256 * 1024 * 1024, 0) ? 0 : 1;
++#elif defined(TOSHI_SKU_WASM)
+ 	// Phones can't spare more, the biggest scenes measured use 88 MB
+ 	Toshi::TMemory::Initialise( 160 * 1024 * 1024, 0 );
+ #elif defined( BARNYARD_COMMUNITY_PATCH )
+@@ -161,11 +167,15 @@ static void ShowSystemMessage( SYSTEMMESSAGE a_eText, SYSTEMMESSAGE a_eCaption )
+ 		s_bShownSystemMessage = TTRUE;
+ 
+ 		Toshi::T2Locale::Lang eLanguage = ALocaleManager::GetDefaultLanguage();
++#ifdef TOSHI_SKU_LINUX
++		fprintf(stderr, "%s: %s\n", s_aSystemMessages[eLanguage][a_eCaption], s_aSystemMessages[eLanguage][a_eText]);
++#else
+ 		MessageBoxA( NULL, s_aSystemMessages[ eLanguage ][ a_eText ], s_aSystemMessages[ eLanguage ][ a_eCaption ], MB_ICONWARNING );
++#endif
+ 	}
+ }
+ 
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ // NOTE: in the original, this is a C initialiser too (.CRT$XI*), run before the memory gets initialised
+ // $Barnyard: FUNCTION 00404240
+ static int __cdecl CheckVirtualMemory()
+@@ -202,6 +212,11 @@ __attribute__( ( constructor( 101 ) ) ) static void InitialiseMemoryConstructor(
+ EM_JS( void, WASM_OnGameQuit, (), {
+ 	postMessage( { bQuit : true } );
+ } );
++#elif defined(TOSHI_SKU_LINUX)
++// Before ordinary C++ statics, retaining the allocator through static destruction.
++__attribute__((constructor(101))) static void InitialiseNativeMemory() {
++    if (InitialiseMemory() != 0) _Exit(90);
++}
+ #else
+ #pragma section( ".CRT$XIT", long, read )
+ extern "C" __declspec( allocate( ".CRT$XIT" ) ) int( __cdecl* g_pfnCheckVirtualMemory )() = CheckVirtualMemory;
+@@ -218,19 +233,21 @@ extern "C" __declspec( allocate( ".CRT$XTU" ) ) void( __cdecl* g_pfnDeinitialise
+ #endif // TOSHI_SKU_WASM
+ 
+ // Handle to the BARNYARD mutex
++#ifdef TOSHI_SKU_WINDOWS
+ static HANDLE s_hBarnyardHandle;
++#endif
+ 
+ MODAPI AApplication g_oTheApp;
+ 
+ TOSHI_NAMESPACE_USING
+ 
+-#if defined( TOSHI_FINAL ) && !defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_FINAL ) && defined( TOSHI_SKU_WINDOWS )
+ #  define TOSHI_ENTRY int WINAPI WinMain( HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, INT cmdShow )
+ #else // TOSHI_FINAL
+ #  define TOSHI_ENTRY int main( int argc, TCHAR** argv )
+ #endif // !TOSHI_FINAL
+ 
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ static const TCHAR* GetOSName( OSVERSIONINFOEX& osVersionInfo )
+ {
+ 	TBOOL isWorkstation = osVersionInfo.wProductType == VER_NT_WORKSTATION;
+@@ -258,7 +275,7 @@ static const TCHAR* GetOSName( OSVERSIONINFOEX& osVersionInfo )
+ #endif // !TOSHI_SKU_WASM
+ 
+ static void EngineQuitCallback();
+-static void CreateEngine( const TCHAR* a_pchCommandLine )
++static TBOOL CreateEngine( const TCHAR* a_pchCommandLine )
+ {
+ 	// Create core engine systems
+ 	// NOTE: slightly different from the original, for more customization
+@@ -266,13 +283,13 @@ static void CreateEngine( const TCHAR* a_pchCommandLine )
+ 	toshiParams.szCommandLine = a_pchCommandLine;
+ 	toshiParams.szLogFileName = "barnyard";
+ 
+-	TUtil::ToshiCreate( toshiParams );
++	if (!TUtil::ToshiCreate(toshiParams)) return TFALSE;
+ 	g_oSystemManager.SetQuitCallback( EngineQuitCallback );
+ 
+ 	AMemory::CreatePool( AMemory::POOL_StringPool );
+ 	TUtil::Log( "Build Version %s\n", "0.28" );
+ 
+-#if defined( BARNYARD_COMMUNITY_PATCH ) && !defined( TOSHI_SKU_WASM )
++#if defined( BARNYARD_COMMUNITY_PATCH ) && defined( TOSHI_SKU_WINDOWS )
+ 	OSVERSIONINFOEX osVersionInfo = { sizeof( osVersionInfo ) };
+ 
+ 	const TCHAR* osName = "unknown";
+@@ -294,6 +311,7 @@ static void CreateEngine( const TCHAR* a_pchCommandLine )
+ 	TUtil::Log( "OS Name: %s\n", osName );
+ 	TUtil::Log( "OS Version: %d.%d Build:%d %s\n", osVersionInfo.dwMajorVersion, osVersionInfo.dwMinorVersion, osVersionInfo.dwBuildNumber, osVersionInfo.szCSDVersion );
+ #endif // BARNYARD_COMMUNITY_PATCH
++	return TTRUE;
+ }
+ 
+ // $Barnyard: FUNCTION 00403fd0
+@@ -317,7 +335,7 @@ static void DestroyLocaleManager()
+ // $Barnyard: FUNCTION 004042c0
+ static void DestroyEngine()
+ {
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ 	ReleaseMutex( s_hBarnyardHandle );
+ #endif
+ 
+@@ -371,12 +389,41 @@ static void EngineQuitCallback()
+ // $Barnyard: FUNCTION 004044a0
+ TOSHI_ENTRY
+ {
++#ifdef TOSHI_SKU_LINUX
++    // Keep this diagnostic representation alive as long as the engine. Actual
++    // argument boundaries (including spaces/empty strings) come from argv below.
++    const std::string nativeCommandLine = BarnyardLinux::commandLine(argc, argv);
++    const TCHAR* pchCommandLine = nativeCommandLine.c_str();
++#else
+ 	const TCHAR* pchCommandLine = GetCommandLineA();
++#endif
+ 
+-	// Create core systems
+-	CreateEngine( pchCommandLine );
++#ifdef TOSHI_SKU_LINUX
++    // Validate/mount roots first, then lock BEFORE opening any shared log/save.
++    if (!TFileManager::Create()) {
++        fprintf(stderr, "Barnyard: invalid asset/user directories\n");
++        return 1;
++    }
++    BarnyardLinux::InstanceLock instanceLock;
++    if (!BarnyardLinux::hasArgument(argc, argv, "-multiinstance")) {
++        auto result = instanceLock.acquire(getenv("BARNYARD_USER_DIR"));
++        if (result != BarnyardLinux::InstanceLock::Result::Acquired) {
++            fprintf(stderr, "Barnyard: %s\n", result == BarnyardLinux::InstanceLock::Result::AlreadyRunning
++                ? "game is already running" : instanceLock.error().c_str());
++            TFileManager::Destroy();
++            return 2;
++        }
++    }
++#endif
++    if (!CreateEngine(pchCommandLine)) {
++        fprintf(stderr, "Barnyard: engine startup failed; check asset/user directories\n");
++#ifdef TOSHI_SKU_LINUX
++        if (TFileManager::IsSingletonCreated()) TFileManager::Destroy();
++#endif
++        return 1;
++    }
+ 
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	if ( !T2String8::FindString( pchCommandLine, "-multiinstance" ) )
+ #endif
+@@ -398,6 +445,12 @@ TOSHI_ENTRY
+ 	TMemory::TestMemIntegrity( TNULL );
+ 	ClassLink_Win::ReferenceClasses();
+ 
++#ifdef TOSHI_SKU_LINUX
++    if (g_oTheApp.Create("The Barnyard - (c) Blue Tongue Entertainment", argc, argv))
++        g_oTheApp.Execute();
++    else
++        g_oTheApp.OnDestroy();
++#else
+ 	// Split the command line into arguments
+ 	TCHAR* aArgs[ 128 ];
+ 	TINT   iNumArgs = 1;
+@@ -433,6 +486,7 @@ TOSHI_ENTRY
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	delete[] pchArgs;
+ #endif
++#endif // native argv versus Windows command-line parsing
+ 
+ 	DestroyEngine();
+ 
+@@ -540,7 +594,7 @@ TBOOL AApplication::OnCreate( int argc, TCHAR** argv )
+ 
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	// Load mods before the game systems are created, so they can hook them
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ 	AModLoader* pModLoader = pScheduler->CreateTask<AModLoader>();
+ 	pModLoader->Create();
+ 	pModLoader->Activate( TTRUE );
+@@ -570,6 +624,11 @@ TBOOL AApplication::OnCreate( int argc, TCHAR** argv )
+ // game.fps_limit (console, AApplication::ms_fFPSLimit) caps the frame rate (0, the default: none, like retail).
+ //-----------------------------------------------------------------------------
+ 
++#ifdef TOSHI_SKU_LINUX
++static BarnyardLinux::FramePacer s_nativeFramePacer;
++static void FrameLimiter_Update() {}
++static void FrameLimiter_Wait() { s_nativeFramePacer.wait(AApplication::ms_fFPSLimit); }
++#else
+ static TBOOL         s_bFrameLimiterInitialised = TFALSE;
+ static LARGE_INTEGER s_iPerfFrequency;
+ static TFLOAT        s_fAppliedLimit  = 0.0f;
+@@ -646,6 +705,8 @@ static void FrameLimiter_Wait()
+ 	s_iNextFrameTime += s_iFrameTicks;
+ }
+ 
++#endif
++
+ TBOOL AApplication::OnUpdate( TFLOAT a_fDeltaTime )
+ {
+ 	FrameLimiter_Update();
+diff --git a/OpenBarnyard/Source/ClassLink.h b/OpenBarnyard/Source/ClassLink.h
+index a471cda..8cb7f19 100644
+--- a/OpenBarnyard/Source/ClassLink.h
++++ b/OpenBarnyard/Source/ClassLink.h
+@@ -1,5 +1,5 @@
+ #pragma once
+ 
+-#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX )
+ #include "ClassLink_Win.h"
+ #endif
+diff --git a/OpenBarnyard/Source/ClassLink_Win.cpp b/OpenBarnyard/Source/ClassLink_Win.cpp
+index 4317816..2c3d3e6 100644
+--- a/OpenBarnyard/Source/ClassLink_Win.cpp
++++ b/OpenBarnyard/Source/ClassLink_Win.cpp
+@@ -101,6 +101,8 @@
+ 
+ #ifdef TOSHI_SKU_WASM
+ #  include <Platform/WASM/Input/TInputInterface_WASM.h>
++#elif defined(TOSHI_SKU_LINUX)
++# include "Platform/Linux/Input/TInputInterface_Linux.h"
+ #else
+ #  include <Platform/Windows/Input/TInputInterface_Win.h>
+ #endif
+@@ -205,6 +207,8 @@ void ClassLink_Win::ReferenceEngineClasses()
+ 	REFERENCE_CLASS( TVertexPoolResource );
+ #ifdef TOSHI_SKU_WASM
+ 	REFERENCE_CLASS( TInputWASMInterface );
++#elif defined(TOSHI_SKU_LINUX)
++	REFERENCE_CLASS(TInputLinuxInterface);
+ #else
+ 	REFERENCE_CLASS( TInputDXInterface );
+ #endif
+@@ -218,6 +222,8 @@ void ClassLink_Win::ReferenceClasses()
+ 	REFERENCE_CLASS( TTextureFactoryHAL );
+ #ifdef TOSHI_SKU_WASM
+ 	REFERENCE_CLASS( TInputWASMInterface );
++#elif defined(TOSHI_SKU_LINUX)
++	REFERENCE_CLASS(TInputLinuxInterface);
+ #else
+ 	REFERENCE_CLASS( TInputDXInterface );
+ #endif
+diff --git a/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp b/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
+index 9fcf20e..8d4c0bc 100644
+--- a/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
++++ b/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
+@@ -32,7 +32,9 @@
+ 
+ #include "Render/ABackend.h"
+ 
++#ifdef TOSHI_SKU_WINDOWS
+ #include <resource.h>
++#endif
+ 
+ // NOTE: the physics headers pull in Opcode's PI macro, keep them last
+ #include "Helpers/AGateManager.h"
+@@ -69,7 +71,7 @@ TBOOL ARenderer::CreateTRender()
+ 	pRenderer->SetAutoCreateSystemResources( TFALSE );
+ 	pRenderer->Create( "Barnyard" );
+ 
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ 	HMODULE hModuleHandle = GetModuleHandleA( TNULL );
+ 	HICON   hIcon         = LoadIconA( hModuleHandle, MAKEINTRESOURCE( IDI_ICON1 ) );
+ 	#ifdef TRENDERINTERFACE_GL
+diff --git a/OpenBarnyard/Source/Platform/Windows/Input/AInputHandler_Win.cpp b/OpenBarnyard/Source/Platform/Windows/Input/AInputHandler_Win.cpp
+index e1cadf4..0bce6f9 100644
+--- a/OpenBarnyard/Source/Platform/Windows/Input/AInputHandler_Win.cpp
++++ b/OpenBarnyard/Source/Platform/Windows/Input/AInputHandler_Win.cpp
+@@ -49,6 +49,8 @@ AInputHandler::AInputHandler()
+ 
+ #ifdef TOSHI_SKU_WASM
+ 	auto pInputInterfaceClass = TClass::Find( "TInputWASMInterface" );
++#elif defined(TOSHI_SKU_LINUX)
++	auto pInputInterfaceClass = TClass::Find("TInputLinuxInterface");
+ #else
+ 	auto pInputInterfaceClass = TClass::Find( "TInputDXInterface" );
+ #endif
+diff --git a/OpenBarnyard/Source/Render/ARenderer.h b/OpenBarnyard/Source/Render/ARenderer.h
+index b0931b8..d8ce676 100644
+--- a/OpenBarnyard/Source/Render/ARenderer.h
++++ b/OpenBarnyard/Source/Render/ARenderer.h
+@@ -2,7 +2,7 @@
+ #include "Cameras/ACamera.h"
+ #include "ASkyDome.h"
+ 
+-#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX )
+ #  include "Platform/Windows/ADisplayModes_Win.h"
+ #endif // TOSHI_SKU_WINDOWS
+ 
+diff --git a/Toshi/Source/File/TLogFile.cpp b/Toshi/Source/File/TLogFile.cpp
+index 8bccb52..2d154c8 100644
+--- a/Toshi/Source/File/TLogFile.cpp
++++ b/Toshi/Source/File/TLogFile.cpp
+@@ -18,6 +18,10 @@ TLogFile::TLogFile()
+ 	m_curLevel       = 0;
+ 	*m_LevelString   = 0;
+ 	*m_typeCounts    = 0;
++#ifdef TOSHI_SKU_LINUX
++	memset(m_typeCounts, 0, sizeof(m_typeCounts));
++	m_bAllowIndentation = TFALSE;
++#endif
+ 	m_unk2           = TNULL;
+ 	m_unk3           = 0;
+ }
+diff --git a/Toshi/Source/Toshi/TApplication.cpp b/Toshi/Source/Toshi/TApplication.cpp
+index a645953..68b0b60 100644
+--- a/Toshi/Source/Toshi/TApplication.cpp
++++ b/Toshi/Source/Toshi/TApplication.cpp
+@@ -17,6 +17,9 @@ TOSHI_NAMESPACE_START
+ TApplication::TApplication()
+ {
+ 	m_Flags = 0;
++#ifdef TOSHI_SKU_LINUX
++	m_pDebugConsole = TNULL;
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 006c17c0
+@@ -24,6 +27,9 @@ TApplication::TApplication()
+ TApplication::~TApplication()
+ {
+ 	Destroy();
++#ifdef TOSHI_SKU_LINUX
++	delete m_pDebugConsole;
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 006c17f0
+@@ -78,6 +84,10 @@ TBOOL TApplication::OnUpdate( TFLOAT deltaTime )
+ TBOOL TApplication::OnDestroy()
+ {
+ 	m_Name = TString8();
++#ifdef TOSHI_SKU_LINUX
++	delete m_pDebugConsole;
++	m_pDebugConsole = TNULL;
++#endif
+ 	return TTRUE;
+ }
+ 
+diff --git a/Toshi/Source/Toshi/TDebugConsole.h b/Toshi/Source/Toshi/TDebugConsole.h
+index 44e4dc0..fc31afb 100644
+--- a/Toshi/Source/Toshi/TDebugConsole.h
++++ b/Toshi/Source/Toshi/TDebugConsole.h
+@@ -6,3 +6,7 @@
+ #ifdef TOSHI_SKU_WASM
+ #  include "Platform/WASM/TDebugConsole_WASM.h"
+ #endif
++
++#ifdef TOSHI_SKU_LINUX
++# include "Platform/Linux/TDebugConsole_Linux.h"
++#endif
+diff --git a/Toshi/Source/Toshi/TSystem.cpp b/Toshi/Source/Toshi/TSystem.cpp
+index 0372ac7..37fef56 100644
+--- a/Toshi/Source/Toshi/TSystem.cpp
++++ b/Toshi/Source/Toshi/TSystem.cpp
+@@ -22,6 +22,10 @@ TSystemTimer::TSystemTimer()
+ 	m_uiNumFrames    = 0;
+ 	m_Unk4           = TFALSE;
+ 	m_fnQuitCallback = TNULL;
++#ifdef TOSHI_SKU_LINUX
++	m_Unk1 = m_Unk2 = m_Unk3 = m_Unk6 = 0;
++	m_fSecond = 0.0f;
++#endif
+ }
+ 
+ void TSystemTimer::Update()
+diff --git a/Toshi/Source/Toshi/TUtil.cpp b/Toshi/Source/Toshi/TUtil.cpp
+index 07728d8..adf6863 100644
+--- a/Toshi/Source/Toshi/TUtil.cpp
++++ b/Toshi/Source/Toshi/TUtil.cpp
+@@ -100,7 +100,11 @@ void TUtil::Log( const TCHAR* a_szFormat, ... )
+ 		formatString.FormatV( a_szFormat, args );
+ 		va_end( args );
+ 
+-		pLogFile->Log( LogType_Info, ms_oToshiParams.szLogAppName, ms_oToshiParams.szLogAppDirName, formatString.Get() );
++		pLogFile->Log( LogType_Info, ms_oToshiParams.szLogAppName, ms_oToshiParams.szLogAppDirName,
++#ifdef TOSHI_SKU_LINUX
++		    "%s",
++#endif
++		    formatString.Get() );
+ 		GetLogEmitter().Throw( LogEvent( pLogFile, LogType_Info, formatString.Get() ) );
+ 	}
+ }
+@@ -118,7 +122,11 @@ void TUtil::Log( LogType a_eLogType, const TCHAR* a_szFormat, ... )
+ 		formatString.FormatV( a_szFormat, args );
+ 		va_end( args );
+ 
+-		pLogFile->Log( a_eLogType, ms_oToshiParams.szLogAppName, ms_oToshiParams.szLogAppDirName, formatString.Get() );
++		pLogFile->Log( a_eLogType, ms_oToshiParams.szLogAppName, ms_oToshiParams.szLogAppDirName,
++#ifdef TOSHI_SKU_LINUX
++		    "%s",
++#endif
++		    formatString.Get() );
+ 		GetLogEmitter().Throw( LogEvent( pLogFile, a_eLogType, formatString.Get() ) );
+ 	}
+ }
+@@ -147,7 +155,7 @@ void TUtil::LogConsole( const TCHAR* a_szFormat, ... )
+ 		va_end( args );
+ 
+ 		OutputDebugStringA( formatString.Get() );
+-		printf( formatString.Get() );
++		printf( "%s", formatString.Get() );
+ 	}
+ }
+ 
+@@ -178,7 +186,15 @@ TBOOL TUtil::ToshiCreate( const TOSHIParams& a_rToshiParams )
+ 
+ 	TSystemManager::Create();
+ 	CreateKernelInterface();
++#ifdef TOSHI_SKU_LINUX
++	if (!TFileManager::IsSingletonCreated() && !TFileManager::Create()) {
++		DestroyKernelInterface();
++		TSystemManager::DestroySystemTimer();
++		return TFALSE;
++	}
++#else
+ 	TFileManager::Create();
++#endif
+ 	CreateTPStringPool();
+ 	Create();
+ 

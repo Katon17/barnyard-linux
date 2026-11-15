@@ -1,0 +1,244 @@
+--- a/Toshi/Source/T2Locale/T2Locale.cpp
++++ b/Toshi/Source/T2Locale/T2Locale.cpp
+@@ -1,5 +1,8 @@
+ #include "ToshiPCH.h"
+ #include "T2Locale.h"
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativePreferences.h"
++#endif
+ 
+ //-----------------------------------------------------------------------------
+ // Enables memory debugging.
+@@ -83,7 +86,14 @@
+ T2LocalisedString T2Locale::GetString( TINT a_iNumString )
+ {
+ 	TASSERT( a_iNumString >= 0 && a_iNumString < GetNumStrings() );
+-	return m_StringTable->Strings[ a_iNumString ];
++	#ifdef TOSHI_SKU_LINUX
++    if(m_LangId==1) {
++        static_assert(sizeof(TWCHAR)==sizeof(char16_t));
++        return const_cast<TWCHAR*>(reinterpret_cast<const TWCHAR*>(BarnyardLinux::LocalizedText(
++            reinterpret_cast<const char16_t*>(m_StringTable->Strings[a_iNumString]))));
++    }
++#endif
++    return m_StringTable->Strings[ a_iNumString ];
+ }
+ 
+ TOSHI_NAMESPACE_END
+--- a/OpenBarnyard/Source/GUI/ASubtitleManager.cpp
++++ b/OpenBarnyard/Source/GUI/ASubtitleManager.cpp
+@@ -1,5 +1,8 @@
+ #include "pch.h"
+ #include "ASubtitleManager.h"
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativePreferences.h"
++#endif
+ #include "GUI/AGUI2.h"
+ #include "GUI/T2GUIFontManager.h"
+ #include "Locale/ALocaleManager.h"
+@@ -54,6 +57,9 @@
+ 	// NOTE: the original checks the start of the line after the last one, which is out of the data
+ 	if ( a_pData->iNumLines > 0 && a_pData->aLines[ a_pData->iNumLines ].iStart == 0 )
+ 		m_wszText = a_pData->aLines[ 0 ].wszText;
++#ifdef TOSHI_SKU_LINUX
++    m_wszText=reinterpret_cast<const TWCHAR*>(BarnyardLinux::LocalizedText(reinterpret_cast<const char16_t*>(m_wszText)));
++#endif
+ 
+ 	Show();
+ }
+@@ -96,6 +102,9 @@
+ 	else
+ 	{
+ 		m_wszText = rLine.wszText;
++#ifdef TOSHI_SKU_LINUX
++        m_wszText=reinterpret_cast<const TWCHAR*>(BarnyardLinux::LocalizedText(reinterpret_cast<const char16_t*>(m_wszText)));
++#endif
+ 		m_oText.SetText( m_wszText );
+ 	}
+ }
+--- a/OpenBarnyard/Source/AOptions.cpp
++++ b/OpenBarnyard/Source/AOptions.cpp
+@@ -22,6 +22,7 @@
+ #include <windows.h>
+ #elif defined(TOSHI_SKU_LINUX)
+ #include "Platform/Linux/NativeOptions.h"
++#include "Platform/Linux/NativePreferences.h"
+ #endif
+ 
+ //-----------------------------------------------------------------------------
+@@ -110,6 +111,10 @@
+ 		if ( !ALocaleManager::IsLanguageSupported( m_eLanguage ) )
+ 			m_eLanguage = ALocaleManager::Lang_EnglishUK;
+ 
++#ifdef TOSHI_SKU_LINUX
++        // Indonesian overlays text only. Keep English asset/voice/subtitle paths.
++        m_eLanguage=ALocaleManager::Lang_EnglishUK;
++#endif
+ 		g_pLocaleManager->SetLanguage( m_eLanguage );
+ #else
+ 		g_pLocaleManager->SetLanguage( ALocaleManager::Lang_EnglishUK );
+@@ -150,7 +155,9 @@
+     std::string error;
+     if (native.load(error)==BarnyardLinux::NativeOptions::LoadResult::Invalid)
+         fprintf(stderr,"Barnyard: Settings/Linux.cfg rejected: %s\n",error.c_str());
+-    m_iWidth=native.width; m_iHeight=native.height;
++    const auto& prefs=BarnyardLinux::NativePreferences();
++    m_iWidth=prefs.windowWidth; m_iHeight=prefs.windowHeight;
++    m_eLanguage=ALocaleManager::Lang_EnglishUK;
+     m_fGamma=native.gamma; m_fSensitivity=native.sensitivity;
+     m_bForcedWindowed=native.windowed; m_bHighDetailGrass=native.highDetailGrass;
+     m_bControllerEnabled=native.controller;
+--- a/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
++++ b/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
+@@ -1,4 +1,7 @@
+ #include "pch.h"
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativePreferences.h"
++#endif
+ #include "AppBoot.h"
+ #include "Assets/AMaterialLibraryManager.h"
+ #include "Assets/AKeyFrameLibraryManager.h"
+@@ -100,8 +103,9 @@
+ 
+ #ifdef TOSHI_SKU_LINUX
+     bool nativeDesktopFullscreen=false;
+-    if(const char* fullscreen=getenv("BARNYARD_FULLSCREEN")) {
+-        bWindowed=strcmp(fullscreen,"1")!=0;
++    {
++        const char* fullscreen=getenv("BARNYARD_FULLSCREEN");
++        bWindowed=fullscreen ? strcmp(fullscreen,"1")!=0 : !BarnyardLinux::NativePreferences().fullscreen;
+         nativeDesktopFullscreen=!bWindowed;
+         if(nativeDesktopFullscreen) {
+             SDL_DisplayMode desktop{};
+@@ -1066,6 +1070,13 @@
+ 
+ 	if ( AOptions::GetSingleton() )
+ 		AOptions::GetSingleton()->SetDisplay( a_iWidth, a_iHeight, a_bWindowed, a_bBorderless );
++#ifdef TOSHI_SKU_LINUX
++    auto prefs=BarnyardLinux::NativePreferences();
++    prefs.fullscreen=!a_bWindowed;
++    if(a_bWindowed){prefs.windowWidth=a_iWidth;prefs.windowHeight=a_iHeight;}
++    if(!BarnyardLinux::StoreNativePreferences(prefs))
++        fprintf(stderr,"Display preference save failed: %s\n",BarnyardLinux::PreferencesError().c_str());
++#endif
+ 
+ 	return TTRUE;
+ #  else
+--- a/OpenBarnyard/Source/GameInterface/AOptionsState.h
++++ b/OpenBarnyard/Source/GameInterface/AOptionsState.h
+@@ -11,6 +11,10 @@
+ 	{
+ 		OPTIONSBUTTON_AUDIO,
+ 		OPTIONSBUTTON_CONTROLS,
++#ifdef TOSHI_SKU_LINUX
++        OPTIONSBUTTON_DISPLAY,
++        OPTIONSBUTTON_LANGUAGE,
++#endif
+ #ifdef BARNYARD_LATEST
+ 		// NOTE: the latest version (Wii) hides the controls button and adds this one
+ 		OPTIONSBUTTON_CAMERA,
+@@ -23,6 +27,9 @@
+ 	inline constexpr static TINT OPTIONSBUTTON_TEXTS[ OPTIONSBUTTON_NUMOF ] = {
+ 		282,
+ 		281,
++#ifdef TOSHI_SKU_LINUX
++        -1, -1, // Native display/language labels, not retail locale IDs.
++#endif
+ #ifdef BARNYARD_LATEST
+ 		3482, // ACameraOptionsState::CAMERA_SPEED_TEXT (the button shows ACameraOptionsState::GetCameraText)
+ 		3476, // ADifficultyOptionState::TITLE_TEXT (the button shows ADifficultyOptionState::GetText)
+--- a/OpenBarnyard/Source/GameInterface/AOptionsState.cpp
++++ b/OpenBarnyard/Source/GameInterface/AOptionsState.cpp
+@@ -1,5 +1,12 @@
+ #include "pch.h"
+ #include "AOptionsState.h"
++#ifdef TOSHI_SKU_LINUX
++#include "Platform/Linux/NativePreferences.h"
++#include "Render/ARenderer.h"
++#include "Render/ABackend.h"
++#include "AFrontEndMainMenuState2.h"
++#include "HUD/AMenuNavHudElement.h"
++#endif
+ #include "Sound/ASoundManager.h"
+ #include "SoundBank/ui.h"
+ #include "GUI/T2GUIFontManager.h"
+@@ -50,6 +57,14 @@
+ // NOTE: inlined in OnInsertion
+ const TWCHAR* AOptionsState::GetButtonText( TINT a_iButton )
+ {
++#ifdef TOSHI_SKU_LINUX
++    bool id=BarnyardLinux::NativePreferences().indonesian;
++    if(a_iButton==OPTIONSBUTTON_DISPLAY) {
++        bool full=!TRenderInterfaceHAL::Interface()->GetCurrentDisplayParams()->bWindowed;
++        return id ? (full?L"Tampilan: Layar penuh":L"Tampilan: Jendela") : (full?L"Display: Fullscreen":L"Display: Windowed");
++    }
++    if(a_iButton==OPTIONSBUTTON_LANGUAGE) return id?L"Bahasa: Indonesia":L"Language: English";
++#endif
+ #ifdef BARNYARD_LATEST
+ 	// NOTE: the Wii skips OPTIONSBUTTON_CONTROLS here (no mouse), the PC keeps it
+ 	if ( a_iButton == OPTIONSBUTTON_CAMERA )
+@@ -108,6 +123,9 @@
+ {
+ 	m_iActivatedButtonID = -1;
+ 	BaseClass::OnActivate();
++#ifdef TOSHI_SKU_LINUX
++    UpdateTexts();
++#endif
+ }
+ 
+ // $Barnyard: FUNCTION 00445150
+@@ -115,6 +133,35 @@
+ {
+ 	AGUI2Button* pButton = TSTATICCAST( AGUI2Button, a_pMenuItem );
+ 	m_iActivatedButtonID = pButton->GetId();
++#ifdef TOSHI_SKU_LINUX
++    if(m_iActivatedButtonID==OPTIONSBUTTON_DISPLAY) {
++        auto* renderer=TRenderInterfaceHAL::Interface();
++        bool full=!renderer->GetCurrentDisplayParams()->bWindowed;
++        auto prefs=BarnyardLinux::NativePreferences();
++        int width=prefs.windowWidth,height=prefs.windowHeight;
++        if(!full) {
++            SDL_DisplayMode desktop{};
++            int display=SDL_GetWindowDisplayIndex(renderer->GetWindow()->GetSDLWindow());
++            if(SDL_GetDesktopDisplayMode(display,&desktop)==0){width=desktop.w;height=desktop.h;}
++        }
++        if(!ARenderer::GetSingleton()->ChangeDisplay(width,height,full,!full))
++            ASoundManager::GetSingleton()->PlayCue(soundbank::UI_NEGATIVE);
++        UpdateTexts();m_iActivatedButtonID=-1;return;
++    }
++    if(m_iActivatedButtonID==OPTIONSBUTTON_LANGUAGE) {
++        auto prefs=BarnyardLinux::NativePreferences();prefs.indonesian=!prefs.indonesian;
++        if(!BarnyardLinux::StoreNativePreferences(prefs)) {
++            fprintf(stderr,"Language preference save failed: %s\n",BarnyardLinux::PreferencesError().c_str());
++            ASoundManager::GetSingleton()->PlayCue(soundbank::UI_NEGATIVE);
++        } else {
++            g_pLocaleManager->SetLanguage(ALocaleManager::Lang_EnglishUK);
++            AMenuNavHudElement::UpdateText();
++            auto* mainMenu=TSTATICCAST(AFrontEndMainMenuState2,AGameStateController::GetSingleton()->FindGameStateOnStack(TPS8D("AFrontEndMainMenuState2")));
++            if(mainMenu)mainMenu->UpdateTexts();
++        }
++        UpdateTexts();m_iActivatedButtonID=-1;return;
++    }
++#endif
+ 
+ 	ABYardMenuState::OnButtonActivated( pButton );
+ }
+--- a/OpenBarnyard/Source/GameInterface/AStartMenuState.cpp
++++ b/OpenBarnyard/Source/GameInterface/AStartMenuState.cpp
+@@ -226,6 +226,16 @@
+ {
+ 	m_iActivatedButton = -1;
+ 	ABYardMenuState::OnActivate();
++#ifdef TOSHI_SKU_LINUX
++    m_oTitle.SetText(g_pLocaleManager->GetString(288));
++    for(int i=0;i<BUTTON_NUMOF;++i) {
++        if(!AGameLoader::IsInMiniGame() && (i==BUTTON_RESTART || i==BUTTON_HELP) && !(m_bHasHint && i==BUTTON_HELP))continue;
++        int text=ms_aButtonTexts[i];
++        if(i==BUTTON_QUIT && AGameLoader::IsInMiniGame() && AGameLoader::IsStoryMode())text=AGameLoader::WasBarnExploreMiniGame()?336:337;
++        m_aButtons[i].SetText(g_pLocaleManager->GetString(text),TTRUE);
++    }
++    m_oMenu.ReflowChildrenVertically();
++#endif
+ 	m_eMenuState = MENUSTATE_MENU_APPEAR;
+ 	m_oDialogTitleBackground.Hide();
+ }

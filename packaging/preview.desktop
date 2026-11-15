@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Barnyard Linux Preview
+GenericName=Port Development Diagnostics
+Comment=Launcher and GLES3 diagnostic preview — cannot play Barnyard yet
+Comment[id]=Pratinjau launcher dan diagnostik GLES3 — belum bisa memainkan Barnyard
+Exec=barnyard-linux-preview
+Icon=barnyard-linux-preview
+Terminal=false
+Categories=Development;
+Keywords=Barnyard;Linux;Preview;Diagnostic;GLES;
+StartupNotify=false

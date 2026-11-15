@@ -1,0 +1,32 @@
+--- a/OpenBarnyard/Source/AppBoot.cpp
++++ b/OpenBarnyard/Source/AppBoot.cpp
+@@ -396,13 +396,13 @@
+ {
+ #ifdef TOSHI_SKU_LINUX
+     if (BarnyardLinux::hasArgument(argc,argv,"--help")) {
+-        puts("Experimental Barnyard Linux i386 runtime. Requires legally owned PC data.");
++        puts("Barnyard Linux 1.0.0 - unofficial community native i386 port. Requires legally owned PC data.");
+         puts("Set BARNYARD_GAME_DIR and BARNYARD_USER_DIR to disjoint directories.");
+         puts("--check-data checks two startup indicators only; --version prints build identity.");
+         return 0;
+     }
+     if (BarnyardLinux::hasArgument(argc,argv,"--version")) {
+-        puts("barnyard-linux-native experimental i386; gameplay not certified");
++        puts("barnyard-linux-native 1.0.0; native i386; unofficial community port");
+         return 0;
+     }
+     // Keep this diagnostic representation alive as long as the engine. Actual
+--- a/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
++++ b/OpenBarnyard/Source/Platform/Windows/ARenderer_Win.cpp
+@@ -72,7 +72,11 @@
+ 	TRenderInterfaceHAL* pRenderer      = TSTATICCAST( TRenderInterfaceHAL, pRendererClass->CreateObject() );
+ 
+ 	pRenderer->SetAutoCreateSystemResources( TFALSE );
++#ifdef TOSHI_SKU_LINUX
++    pRenderer->Create("Barnyard Linux");
++#else
+ 	pRenderer->Create( "Barnyard" );
++#endif
+ 
+ #ifdef TOSHI_SKU_WINDOWS
+ 	HMODULE hModuleHandle = GetModuleHandleA( TNULL );

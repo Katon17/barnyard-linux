@@ -1,0 +1,41 @@
+--- a/OpenBarnyard/Source/AppBoot.cpp
++++ b/OpenBarnyard/Source/AppBoot.cpp
+@@ -390,6 +390,16 @@
+ TOSHI_ENTRY
+ {
+ #ifdef TOSHI_SKU_LINUX
++    if (BarnyardLinux::hasArgument(argc,argv,"--help")) {
++        puts("Experimental Barnyard Linux i386 runtime. Requires legally owned PC data.");
++        puts("Set BARNYARD_GAME_DIR and BARNYARD_USER_DIR to disjoint directories.");
++        puts("--check-data checks two startup indicators only; --version prints build identity.");
++        return 0;
++    }
++    if (BarnyardLinux::hasArgument(argc,argv,"--version")) {
++        puts("barnyard-linux-native experimental i386; gameplay not certified");
++        return 0;
++    }
+     // Keep this diagnostic representation alive as long as the engine. Actual
+     // argument boundaries (including spaces/empty strings) come from argv below.
+     const std::string nativeCommandLine = BarnyardLinux::commandLine(argc, argv);
+@@ -403,6 +413,21 @@
+     if (!TFileManager::Create()) {
+         fprintf(stderr, "Barnyard: invalid asset/user directories\n");
+         return 1;
++    }
++    // Fail cleanly before task/class initialization on missing data; this is
++    // only an indicator check, never a substitute for real TRB/game validation.
++    for (const char* indicator : {"Data/GUI/Fonts.trb","Data/GUI/TexSec.trb"}) {
++        TFile* file=TFile::Create(indicator);
++        const bool present=file && file->GetSize()>0;
++        if(file) file->Destroy();
++        if(!present) {
++            fprintf(stderr,"Barnyard: missing/empty PC asset: %s\n",indicator);
++            TFileManager::Destroy();return 3;
++        }
++    }
++    if(BarnyardLinux::hasArgument(argc,argv,"--check-data")) {
++        puts("PC data indicators found; full data compatibility/gameplay NOT verified.");
++        TFileManager::Destroy();return 0;
+     }
+     BarnyardLinux::InstanceLock instanceLock;
+     if (!BarnyardLinux::hasArgument(argc, argv, "-multiinstance")) {

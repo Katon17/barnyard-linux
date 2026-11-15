@@ -1,0 +1,721 @@
+--- a/PrimeDebug/Source/Util/PString.h
++++ b/PrimeDebug/Source/Util/PString.h
+@@ -63,7 +63,12 @@
+ 
+ 	static void FormatV( TCHAR* a_szDest, TINT a_iDestSize, const TCHAR* a_szFormat, va_list a_Args )
+ 	{
++#ifdef TOSHI_SKU_LINUX
++		if ( a_iDestSize > 0 )
++			vsnprintf( a_szDest, a_iDestSize, a_szFormat, a_Args );
++#else
+ 		_vsnprintf_s( a_szDest, a_iDestSize, _TRUNCATE, a_szFormat, a_Args );
++#endif
+ 	}
+ 
+ 	// The first token of a_szString (strtok): the delimiters before it are skipped, the one after it is cut
+@@ -75,7 +80,11 @@
+ 		if ( a_szString == TNULL )
+ 			return TNULL;
+ 
++#ifdef TOSHI_SKU_LINUX
++		return strtok_r( a_szString, a_szDelimiters, &pContext );
++#else
+ 		return strtok_s( a_szString, a_szDelimiters, &pContext );
++#endif
+ 	}
+ 
+ 	// $deBlob2: FUNCTION 0057e156
+--- a/PrimeDebug/Source/Draw/PDebugText.cpp
++++ b/PrimeDebug/Source/Draw/PDebugText.cpp
+@@ -97,7 +97,7 @@
+ 				{
+ 					bDraw = TTRUE;
+ 				}
+-				else if ( ms_fWrapWidth + a_fX < TFLOAT( pSpace - pChar ) * CHAR_WIDTH * a_fScale + fX )
++				else if ( ms_fWrapWidth + a_fX < TFLOAT( pSpace - pChar ) * GLYPH_WIDTH * a_fScale + fX )
+ 				{
+ 					fY += fLineHeight;
+ 					fX    = a_fX;
+@@ -163,7 +163,7 @@
+ 			if ( !( a_uiFlags & FLAGS_MEASUREONLY ) )
+ 				AddQuad( a_fScale * 0.0055f, a_fScale * 0.013750001f, fX, fY, TCHAR( uiChar ), a_uiColour );
+ 
+-			fCurX = a_fScale * CHAR_WIDTH + fX;
++			fCurX = a_fScale * GLYPH_WIDTH + fX;
+ 			fX    = fCurX;
+ 
+ 			if ( a_pWidth && *a_pWidth <= fCurX - a_fX )
+@@ -296,7 +296,7 @@
+ // $deBlob2: FUNCTION 00805877
+ TFLOAT PDebugText::GetCharWidth()
+ {
+-	return CHAR_WIDTH;
++	return GLYPH_WIDTH;
+ }
+ 
+ // $deBlob2: FUNCTION 00805891
+@@ -314,7 +314,7 @@
+ // $deBlob2: FUNCTION 008058b5
+ void PDebugText::SetTabSize( TINT a_iCharacters )
+ {
+-	ms_fTabWidth = TFLOAT( a_iCharacters ) * CHAR_WIDTH;
++	ms_fTabWidth = TFLOAT( a_iCharacters ) * GLYPH_WIDTH;
+ }
+ 
+ // $deBlob2: FUNCTION 008058e5
+@@ -339,7 +339,7 @@
+ 	ms_bStarted    = TTRUE;
+ 	ms_fCursorX    = MARGIN;
+ 	ms_fCursorY    = MARGIN;
+-	ms_fTabWidth   = 8 * CHAR_WIDTH;
++	ms_fTabWidth   = 8 * GLYPH_WIDTH;
+ 	ms_fWrapWidth  = 0.9f;
+ 	ms_pGlyphs     = new PDebugGlyph[ ms_uiMaxGlyphs ];
+ 	ms_uiNumGlyphs = 0;
+--- a/PrimeDebug/Source/Draw/PDebugText.h
++++ b/PrimeDebug/Source/Draw/PDebugText.h
+@@ -18,7 +18,7 @@
+ {
+ public:
+ 	static constexpr TFLOAT LINE_HEIGHT = 0.0275f;
+-	static constexpr TFLOAT CHAR_WIDTH  = 0.011f;
++	static constexpr TFLOAT GLYPH_WIDTH  = 0.011f;
+ 	static constexpr TFLOAT MARGIN      = 0.05f;
+ 	static constexpr TINT   FORMAT_SIZE = 0x400;
+ 
+--- a/Toshi/Source/Toshi/TDateTime.cpp
++++ b/Toshi/Source/Toshi/TDateTime.cpp
+@@ -32,10 +32,18 @@
+ // $Barnyard: FUNCTION 006bbbb0
+ TBOOL TDateTime::GetLocalTime( TDateTime& a_rOutDateTime )
+ {
++#ifdef TOSHI_SKU_LINUX
++	const time_t now = time( nullptr );
++	tm localTime;
++	if ( now == time_t(-1) || !localtime_r( &now, &localTime ) )
++		return TFALSE;
++	tm* pTime = &localTime;
++#else
+ 	__time32_t iTime;
+ 	_time32( &iTime );
+ 
+ 	tm* pTime = _localtime32( &iTime );
++#endif
+ 
+ 	a_rOutDateTime.uiHour   = TUINT8( pTime->tm_hour );
+ 	a_rOutDateTime.uiMinute = TUINT8( pTime->tm_min );
+--- a/Toshi/Source/Toshi/T2SharedPtr.h
++++ b/Toshi/Source/Toshi/T2SharedPtr.h
+@@ -25,8 +25,8 @@
+ 		TUINT uiNumRefs;
+ 	};
+ 
+-	template <typename T> friend class T2SharedPtr;
+-	template <typename T> friend class T2WeakPtr;
++	template <typename U> friend class T2SharedPtr;
++	template <typename U> friend class T2WeakPtr;
+ 
+ #ifdef TOSHI2_ENABLE_SHARED_PTR_VALIDATION
+ 	static constexpr TUINT32 VALIDATION_MAGIC = 'T2SP';
+@@ -315,7 +315,7 @@
+ class T2WeakPtr
+ {
+ public:
+-	template <typename T> friend class T2SharedPtr;
++	template <typename U> friend class T2SharedPtr;
+ 
+ public:
+ 	// Constructor
+--- a/Toshi/Source/File/TFileLexerUTF8.cpp
++++ b/Toshi/Source/File/TFileLexerUTF8.cpp
+@@ -152,6 +152,8 @@
+ 	Define( "TOSHI_SKU_GC" );
+ #elif defined( TOSHI_SKU_WII )
+ 	Define( "TOSHI_SKU_WII" );
++#elif defined( TOSHI_SKU_LINUX )
++	Define( "TOSHI_SKU_LINUX" );
+ #elif defined( TOSHI_SKU_WASM )
+ 	Define( "TOSHI_SKU_WASM" );
+ #else
+--- a/Toshi/Vendor/Opcode/Source/OPC_MeshInterface.h
++++ b/Toshi/Vendor/Opcode/Source/OPC_MeshInterface.h
+@@ -142,7 +142,7 @@
+ 		 *	\return		true if success
+ 		 */
+ 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+-		inline_			bool				RemapClient(udword nb_indices, const udword* permutation)	const;
++		bool				RemapClient(udword nb_indices, const udword* permutation)	const;
+ 
+ 		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ 		/**
+--- a/OpenBarnyard/Source/MiniGame/ABarnYardPoolMiniGameState_Game.cpp
++++ b/OpenBarnyard/Source/MiniGame/ABarnYardPoolMiniGameState_Game.cpp
+@@ -21,7 +21,7 @@
+ #include <Toshi/T2String8.h>
+ #include "SoundBank/pool.h"
+ 
+-#ifdef BARNYARD_COMMUNITY_PATCH
++#if defined( BARNYARD_COMMUNITY_PATCH ) && defined( TOSHI_SKU_WINDOWS )
+ #  include <windows.h>
+ #endif
+ 
+--- a/OpenBarnyard/Source/Physics/ABarnyardCollision.h
++++ b/OpenBarnyard/Source/Physics/ABarnyardCollision.h
+@@ -8,7 +8,11 @@
+ // (ACollisionManager) using a temporary ACollisionObjectSimpleDummy.
+ // NOTE: empty_bases keeps the retail size (three vtable pointers)
+ //-----------------------------------------------------------------------------
++#if defined( _MSC_VER )
+ class __declspec( empty_bases ) ABarnyardCollision
++#else
++class ABarnyardCollision
++#endif
+     : public APhysics::ACollisionInterface<APhysics::ARay>
+     , public APhysics::ACollisionInterface<APhysics::ASphere>
+     , public APhysics::ACollisionInterface<APhysics::ASweptSphere>
+--- a/OpenBarnyard/Source/Helpers/AGameLoader.cpp
++++ b/OpenBarnyard/Source/Helpers/AGameLoader.cpp
+@@ -1,4 +1,7 @@
+ #include "pch.h"
++#ifdef TOSHI_SKU_LINUX
++#include <chrono>
++#endif
+ #include "AGameLoader.h"
+ #include "FSM/AFunctionTable.h"
+ #include "ALoadScreen.h"
+@@ -101,6 +104,16 @@
+ 
+ TOSHI_NAMESPACE_USING
+ 
++static const TCHAR* LoaderCommandLine()
++{
++#ifdef TOSHI_SKU_LINUX
++	return TUtil::GetToshiParameters().szCommandLine;
++#else
++	return GetCommandLineA();
++#endif
++}
++
++
+ TPSTRING8_DECLARE( honey_collecting_replay );
+ 
+ //-----------------------------------------------------------------------------
+@@ -2843,7 +2856,7 @@
+ {
+ 	a_szOutName[ 0 ] = '\0';
+ 
+-	const TCHAR* szArg = TStringManager::String8FindString( GetCommandLineA(), "-minigame " );
++	const TCHAR* szArg = TStringManager::String8FindString( LoaderCommandLine(), "-minigame " );
+ 	if ( !szArg )
+ 		return a_szOutName;
+ 
+@@ -2896,13 +2909,17 @@
+ 
+ 	if ( !s_szCommandLine )
+ 	{
+-		TString8 strCommandLine = GetCommandLineA();
++		TString8 strCommandLine = LoaderCommandLine();
+ 
+ 		if ( Dev_GetMicroGame() )
+ 			strCommandLine += " -simstate";
+ 
+ 		const TINT iLength = strCommandLine.Length();
+-		s_szCommandLine    = TSTATICCAST( TCHAR, HeapAlloc( GetProcessHeap(), 0, iLength + 1 ) );
++		#ifdef TOSHI_SKU_LINUX
++		s_szCommandLine = new TCHAR[iLength + 1];
++#else
++		s_szCommandLine = TSTATICCAST( TCHAR, HeapAlloc( GetProcessHeap(), 0, iLength + 1 ) );
++#endif
+ 		TStringManager::String8Copy( s_szCommandLine, strCommandLine, iLength + 1 );
+ 	}
+ 
+@@ -3201,10 +3218,20 @@
+ 	return Dev_GetMiniGameArg( szName, sizeof( szName ) )[ 0 ] != '\0';
+ }
+ 
++#ifdef TOSHI_SKU_LINUX
++static TUINT32 Dev_InstructionTicks()
++{
++	return TUINT32( std::chrono::duration_cast<std::chrono::milliseconds>(
++		std::chrono::steady_clock::now().time_since_epoch()).count() );
++}
++#else
++static TUINT32 Dev_InstructionTicks() { return GetTickCount(); }
++#endif
++
+ void AGameLoader::Dev_UpdateMiniGameRequest()
+ {
+ 	static TBOOL s_bStarted           = TFALSE;
+-	static DWORD s_uiInstructionStart = 0;
++	static TUINT32 s_uiInstructionStart = 0;
+ 
+ 	// The micro games are started by the sim (Dev_UpdateSimStateRequest)
+ 	if ( !Dev_IsMiniGameRequested() || Dev_GetMicroGame() )
+@@ -3218,12 +3245,12 @@
+ 		if ( pCurrentState && pCurrentState->IsA( &TGetClass( AMiniGameInstructionState ) ) )
+ 		{
+ 			if ( s_uiInstructionStart == 0 )
+-				s_uiInstructionStart = GetTickCount();
+-
+-			if ( s_uiInstructionStart != DWORD( -1 ) && GetTickCount() - s_uiInstructionStart >= 2000 )
++				s_uiInstructionStart = Dev_InstructionTicks();
++
++			if ( s_uiInstructionStart != TUINT32( -1 ) && Dev_InstructionTicks() - s_uiInstructionStart >= 2000 )
+ 			{
+ 				TINFO( "-minigame: dismissing the instruction screen\n" );
+-				s_uiInstructionStart = DWORD( -1 );
++				s_uiInstructionStart = TUINT32( -1 );
+ 				TSTATICCAST( AMiniGameInstructionState, pCurrentState )->Dismiss();
+ 			}
+ 		}
+@@ -3349,8 +3376,19 @@
+ 	else
+ #  endif
+ 	{
++#ifdef TOSHI_SKU_LINUX
++		// Never place a predictable development save in a shared /tmp directory.
++		const char* user = getenv("BARNYARD_USER_DIR");
++		const int count = user ? snprintf(szPath, sizeof(szPath), "%s/OpenBarnyard_devsave.by", user) : -1;
++		if ( count < 0 || count >= int(sizeof(szPath)) )
++		{
++			TWARN("Development save path missing or too long\n");
++			return;
++		}
++#else
+ 		GetTempPathA( sizeof( szPath ), szPath );
+ 		strcat( szPath, "OpenBarnyard_devsave.by" );
++#endif
+ 	}
+ 
+ 	SaveLoadSKU::Dev_SetSavePath( szPath );
+--- a/OpenBarnyard/Source/Debug/ADebugOverlay.cpp
++++ b/OpenBarnyard/Source/Debug/ADebugOverlay.cpp
+@@ -70,7 +70,11 @@
+ 
+ 	va_list args;
+ 	va_start( args, a_szFormat );
++#ifdef TOSHI_SKU_LINUX
++	vsnprintf( rLine.szText, MAX_LINE_LENGTH, a_szFormat, args );
++#else
+ 	_vsnprintf_s( rLine.szText, MAX_LINE_LENGTH, _TRUNCATE, a_szFormat, args );
++#endif
+ 	va_end( args );
+ 
+ 	// The systems updated more than once a frame print the same line again
+--- a/OpenBarnyard/Source/Debug/APrimeDebugRenderer.cpp
++++ b/OpenBarnyard/Source/Debug/APrimeDebugRenderer.cpp
+@@ -163,16 +163,21 @@
+ 	}
+ 
+ 	// CD3DFont's height is in points
++#ifdef TOSHI_SKU_LINUX
++	// GL debug fonts use logical pixels; no GDI device context exists.
++	TINT iDPI = 96;
++#else
+ 	HDC  hDC  = GetDC( NULL );
+ 	TINT iDPI = GetDeviceCaps( hDC, LOGPIXELSY );
+ 	ReleaseDC( NULL, hDC );
++#endif
+ 
+ 	if ( iDPI <= 0 )
+ 		iDPI = 96;
+ 
+ 	TINT iPoints = TMath::Max( 4, ( a_iPixels * 72 + iDPI / 2 ) / iDPI );
+ 
+-	TDebugFontHAL* pFont = new TDebugFontHAL( "Lucida Console", DWORD( iPoints ), 0 );
++	TDebugFontHAL* pFont = new TDebugFontHAL( "Lucida Console", TUINT32( iPoints ), 0 );
+ #	ifdef TRENDERINTERFACE_DX8
+ 	pFont->InitDeviceObjects( TRenderInterfaceHAL::Interface()->GetDirect3DDevice() );
+ #	else
+--- a/OpenBarnyard/Source/Debug/APrimeDebug.cpp
++++ b/OpenBarnyard/Source/Debug/APrimeDebug.cpp
+@@ -1,4 +1,15 @@
+ #include "pch.h"
++#ifdef TOSHI_SKU_LINUX
++#include <chrono>
++#include <SDL2/SDL.h>
++#include <sys/stat.h>
++#include <unistd.h>
++// Keep the same screenshot buffer capacity across platforms, without Windows MAX_PATH.
++static constexpr int DEBUG_PATH_CAPACITY = 4096;
++static const auto s_nativeDebugStart = std::chrono::steady_clock::now();
++#else
++static constexpr int DEBUG_PATH_CAPACITY = MAX_PATH;
++#endif
+ #include "APrimeDebug.h"
+ 
+ #ifdef PRIMEDEBUG
+@@ -246,9 +257,9 @@
+ static TFLOAT           s_afShotTimes[ MAX_SHOT_TIMES ];
+ static TBOOL            s_abShotTaken[ MAX_SHOT_TIMES ];
+ static TINT             s_iNumShotTimes;
+-static TCHAR            s_szQueuedShot[ MAX_PATH ];
++static TCHAR            s_szQueuedShot[ DEBUG_PATH_CAPACITY ];
+ static TRenderCapture*  s_pShotCapture;
+-static TCHAR            s_szShotFile[ MAX_PATH ];
++static TCHAR            s_szShotFile[ DEBUG_PATH_CAPACITY ];
+ static TINT             s_iShotFrames;
+ static TGenericListener s_oEndSceneListener;
+ 
+@@ -258,9 +269,13 @@
+ static PCFunc s_oNetworkEditorFunc;
+ static PCFunc s_oMenuCloseFunc;
+ 
++#ifdef TOSHI_SKU_LINUX
++static std::chrono::steady_clock::time_point s_oFrameStart, s_oLastFrameEnd;
++#else
+ static LARGE_INTEGER s_oFrequency;
+ static LARGE_INTEGER s_oFrameStart;
+ static LARGE_INTEGER s_oLastFrameEnd;
++#endif
+ static TFLOAT        s_fCpuTime;
+ 
+ static PCVar s_oNetworkSavePathVar;
+@@ -358,7 +373,7 @@
+ // Save\OpenBarnyard_dev.cfg, next to savedata.by (SaveLoadSKU)
+ static const TCHAR* GetDevConfigPath()
+ {
+-	static TCHAR s_szPath[ MAX_PATH ];
++	static TCHAR s_szPath[ DEBUG_PATH_CAPACITY ];
+ 
+ 	if ( s_szPath[ 0 ] == '\0' )
+ 		TStringManager::String8Format( s_szPath, sizeof( s_szPath ), "%s\\OpenBarnyard_dev.cfg", SaveLoadSKU::GetSaveDirectory() );
+@@ -371,7 +386,12 @@
+ // lines starting with '+'
+ void APrimeDebug::RunCommandLine( TBOOL ( *a_fnFilter )( const TCHAR* a_szLine ) )
+ {
+-	const TCHAR* pChar = GetCommandLineA();
++	const TCHAR* pChar =
++#ifdef TOSHI_SKU_LINUX
++		TUtil::GetToshiParameters().szCommandLine;
++#else
++		GetCommandLineA();
++#endif
+ 
+ 	TCHAR szLine[ PConsole::MAX_LINE ];
+ 	TINT  iLength = -1; // -1: no line
+@@ -650,6 +670,10 @@
+ 	szLine[ sizeof( szLine ) - 1 ] = '\0';
+ 	TINFO( "[primedebug] %s\n", szLine );
+ 
++#ifdef TOSHI_SKU_LINUX
++	if ( SDL_SetClipboardText( szLine ) != 0 )
++		return TFALSE;
++#else
+ 	if ( OpenClipboard( NULL ) )
+ 	{
+ 		EmptyClipboard();
+@@ -665,6 +689,7 @@
+ 
+ 		CloseClipboard();
+ 	}
++#endif
+ 
+ 	return TTRUE;
+ }
+@@ -722,6 +747,9 @@
+ 
+ static TFLOAT GetTimeSinceStart()
+ {
++#ifdef TOSHI_SKU_LINUX
++	return std::chrono::duration<TFLOAT>( std::chrono::steady_clock::now() - s_nativeDebugStart ).count();
++#else
+ 	FILETIME oCreation, oExit, oKernel, oUser, oNow;
+ 	GetProcessTimes( GetCurrentProcess(), &oCreation, &oExit, &oKernel, &oUser );
+ 	GetSystemTimeAsFileTime( &oNow );
+@@ -733,6 +761,7 @@
+ 	uiNow.HighPart      = oNow.dwHighDateTime;
+ 
+ 	return TFLOAT( double( uiNow.QuadPart - uiCreation.QuadPart ) / 10000000.0 );
++#endif
+ }
+ 
+ // String variables have no change callback: dev.screenshot_times is parsed again when it changes
+@@ -775,7 +804,11 @@
+ 	if ( !szDir || szDir[ 0 ] == '\0' ) szDir = "Screenshots";
+ 	if ( !szTag || szTag[ 0 ] == '\0' ) szTag = "screenshot";
+ 
++#ifdef TOSHI_SKU_LINUX
++	mkdir( szDir, 0700 ); // Encoding/IO errors are reported by the capture writer.
++#else
+ 	CreateDirectoryA( szDir, NULL );
++#endif
+ 	PString::Format( a_szOut, a_iSize, "%s/%s_%s.png", szDir, szTag, a_szSuffix );
+ }
+ 
+@@ -794,7 +827,13 @@
+ 	PString::Format( szSuffix, sizeof( szSuffix ), "%d", TINT( GetTimeSinceStart() ) );
+ 	GetShotFileName( s_szQueuedShot, sizeof( s_szQueuedShot ), szSuffix );
+ 
+-	for ( TINT i = 2; GetFileAttributesA( s_szQueuedShot ) != INVALID_FILE_ATTRIBUTES && i < 100; i++ )
++	for ( TINT i = 2;
++#ifdef TOSHI_SKU_LINUX
++		access( s_szQueuedShot, F_OK ) == 0
++#else
++		GetFileAttributesA( s_szQueuedShot ) != INVALID_FILE_ATTRIBUTES
++#endif
++ && i < 100; i++ )
+ 	{
+ 		PString::Format( szSuffix, sizeof( szSuffix ), "%d_%d", TINT( GetTimeSinceStart() ), i );
+ 		GetShotFileName( s_szQueuedShot, sizeof( s_szQueuedShot ), szSuffix );
+@@ -1096,7 +1135,11 @@
+ 
+ void APrimeDebug::Update( TFLOAT a_fDeltaTime )
+ {
++#ifdef TOSHI_SKU_LINUX
++	s_oFrameStart = std::chrono::steady_clock::now();
++#else
+ 	QueryPerformanceCounter( &s_oFrameStart );
++#endif
+ 
+ 	ReadKeyboard();
+ 	SyncVars();
+@@ -1119,6 +1162,15 @@
+ void APrimeDebug::Render2D()
+ {
+ 	// The frame stats: the CPU time of the last frame (from its update to here) and the time between two frames
++#ifdef TOSHI_SKU_LINUX
++	const auto oNow = std::chrono::steady_clock::now();
++	if ( s_oLastFrameEnd.time_since_epoch().count() != 0 )
++	{
++		const TFLOAT fFrameTime = std::chrono::duration<TFLOAT>(oNow - s_oLastFrameEnd).count();
++		s_fCpuTime = std::chrono::duration<TFLOAT>(oNow - s_oFrameStart).count();
++		PDebugSystem::UpdateStats(s_fCpuTime, fFrameTime);
++	}
++#else
+ 	LARGE_INTEGER oNow;
+ 	QueryPerformanceCounter( &oNow );
+ 
+@@ -1129,6 +1181,7 @@
+ 		PDebugSystem::UpdateStats( s_fCpuTime, fFrameTime );
+ 	}
+ 
++#endif
+ 	s_oLastFrameEnd = oNow;
+ 
+ 	if ( !s_pRenderer || !s_pRenderer->Begin2D() )
+@@ -1174,7 +1227,9 @@
+ void APrimeDebug::Create()
+ {
+ #  ifdef PRIMEDEBUG_DEV
++#  ifndef TOSHI_SKU_LINUX
+ 	QueryPerformanceFrequency( &s_oFrequency );
++#  endif
+ 	s_pRenderer = new APrimeDebugRenderer();
+ 	PDebugSystem::Startup( s_pRenderer );
+ 	RegisterGame();
+--- a/OpenBarnyard/Source/GameInterface/AAudioOptionsState.cpp
++++ b/OpenBarnyard/Source/GameInterface/AAudioOptionsState.cpp
+@@ -508,7 +508,7 @@
+ 
+ 			if ( m_aArrows[ i ].IsPointInside( vecElementRelCursorPos.x, vecElementRelCursorPos.y ) )
+ 			{
+-				TVALIDPTR( m_fnArrowFocusCallback );
++				TASSERT( m_fnArrowFocusCallback != TNULL );
+ 				m_fnArrowFocusCallback( m_pCallbackUserData, m_iID );
+ 				m_iLastPressedArrowIndex = i;
+ 			}
+--- a/OpenBarnyard/Source/GameInterface/AFrontEndPlayersState.cpp
++++ b/OpenBarnyard/Source/GameInterface/AFrontEndPlayersState.cpp
+@@ -244,7 +244,7 @@
+ 	pScreenElem->AddChildTail(&m_oDialog);
+ 	*/
+ 
+-#if !defined( TOSHI_SKU_WINDOWS ) && !defined( TOSHI_SKU_WASM )
++#if !defined( TOSHI_SKU_WINDOWS ) && !defined( TOSHI_SKU_WASM ) && !defined( TOSHI_SKU_LINUX )
+ 	// Unlock the inputhandler so that new controllers can be recognised
+ 	AInputHandler::GetSingleton()->Lock( TFALSE );
+ #endif // !TOSHI_SKU_WINDOWS
+@@ -283,7 +283,7 @@
+ 
+ 	// Lock the inputhandler to the current control set
+ 	// so that new controllers won't be recognised
+-#if !defined( TOSHI_SKU_WINDOWS ) && !defined( TOSHI_SKU_WASM )
++#if !defined( TOSHI_SKU_WINDOWS ) && !defined( TOSHI_SKU_WASM ) && !defined( TOSHI_SKU_LINUX )
+ 	AInputHandler::GetSingleton()->Lock( TTRUE );
+ #endif // !TOSHI_SKU_WINDOWS
+ 
+--- a/OpenBarnyard/Source/CVar/AVarType.cpp
++++ b/OpenBarnyard/Source/CVar/AVarType.cpp
+@@ -30,7 +30,7 @@
+ {
+ }
+ 
+-static BOOL s_bInitialised;
++static TBOOL s_bInitialised;
+ 
+ // $Barnyard: FUNCTION 006c1a60
+ void AVarType::Create( Toshi::TPString8Pool* a_pStringPool )
+--- a/OpenBarnyard/Source/FX/AGameTimeFX.cpp
++++ b/OpenBarnyard/Source/FX/AGameTimeFX.cpp
+@@ -8,7 +8,7 @@
+ 
+ #include "Render/ABackend.h"
+ 
+-#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX )
+ #  include "Render/ARenderer.h"
+ #endif // TOSHI_SKU_WINDOWS
+ 
+--- a/OpenBarnyard/Source/FX/AAniEffect.h
++++ b/OpenBarnyard/Source/FX/AAniEffect.h
+@@ -55,6 +55,10 @@
+ 
+ 	AAniEffect* m_pNextEffect; // 0x4
+ 	FLAGS       m_eFlags;      // 0x8
++#ifdef TOSHI_SKU_LINUX
++	// Occupy the MSVC base tail: GCC otherwise reuses it in derived classes.
++	TUINT8 m_nativeTail[3];
++#endif
+ };
+ 
+ TSTATICASSERT( sizeof( AAniEffect ) == 0xc );
+--- a/OpenBarnyard/Source/Cameras/ACameraHelper.h
++++ b/OpenBarnyard/Source/Cameras/ACameraHelper.h
+@@ -55,4 +55,8 @@
+ 	Toshi::TRef<AUnitProxy> m_pTarget; // 0x4
+ 	ACamera*                m_pCamera; // 0x8
+ 	TBOOL                   m_bUnk;    // 0xc
++#ifdef TOSHI_SKU_LINUX
++	// Occupy the MSVC base tail: GCC otherwise reuses it in derived classes.
++	TUINT8 m_nativeTail[3];
++#endif
+ };
+--- a/OpenBarnyard/Source/Sound/ASoundManager.cpp
++++ b/OpenBarnyard/Source/Sound/ASoundManager.cpp
+@@ -33,6 +33,16 @@
+ 
+ TOSHI_NAMESPACE_USING
+ 
++static const TCHAR* SoundCommandLine()
++{
++#ifdef TOSHI_SKU_LINUX
++	return TUtil::GetToshiParameters().szCommandLine;
++#else
++	return GetCommandLineA();
++#endif
++}
++
++
+ TPSTRING8_DECLARE( am_m );
+ TPSTRING8_DECLARE( am_f );
+ TPSTRING8_DECLARE( VO );
+@@ -1727,7 +1737,7 @@
+ {
+ #ifdef BARNYARD_COMMUNITY_PATCH
+ 	// Dev switches: "-background" (and "-mute") runs make no sound. Everything else keeps working, FMOD just has no output device.
+-	const TBOOL bMuted = T2String8::FindString( GetCommandLineA(), "-background" ) || T2String8::FindString( GetCommandLineA(), "-mute" );
++	const TBOOL bMuted = T2String8::FindString( SoundCommandLine(), "-background" ) || T2String8::FindString( SoundCommandLine(), "-mute" );
+ 	if ( bMuted ) FSOUND_SetOutput( FSOUND_OUTPUT_NOSOUND );
+ #endif
+ 
+--- a/OpenBarnyard/Source/Sound/AMultiplexStream.cpp
++++ b/OpenBarnyard/Source/Sound/AMultiplexStream.cpp
+@@ -1,4 +1,8 @@
+ #include "pch.h"
++#ifdef TOSHI_SKU_LINUX
++#include <thread>
++#include <chrono>
++#endif
+ #include "AMultiplexStream.h"
+ #include "ASoundManager.h"
+ 
+@@ -183,16 +187,20 @@
+ {
+ 	if ( m_iChannel != -1 )
+ 	{
+-		FSOUND_SetReserved( m_iChannel, FALSE );
++		FSOUND_SetReserved( m_iChannel, TFALSE );
+ 
+ 		for ( TINT i = 0; i < m_iNumSubChannels; i++ )
+-			FSOUND_SetReserved( FSOUND_GetSubChannel( m_iChannel, i ), FALSE );
++			FSOUND_SetReserved( FSOUND_GetSubChannel( m_iChannel, i ), TFALSE );
+ 	}
+ 
+ 	if ( a_bImmediately )
+ 	{
+ 		while ( FSOUND_Stream_GetOpenState( (FSOUND_STREAM*)m_pStream ) == ASoundManager::OPENSTATE_OPENING )
++#ifdef TOSHI_SKU_LINUX
++			std::this_thread::sleep_for( std::chrono::milliseconds(5) );
++#else
+ 			Sleep( 5 );
++#endif
+ 
+ 		FSOUND_Stream_Close( (FSOUND_STREAM*)m_pStream );
+ 		m_pStream        = TNULL;
+@@ -211,10 +219,10 @@
+ {
+ 	if ( m_iChannel != -1 )
+ 	{
+-		FSOUND_SetReserved( m_iChannel, FALSE );
++		FSOUND_SetReserved( m_iChannel, TFALSE );
+ 
+ 		for ( TINT i = 0; i < m_iNumSubChannels; i++ )
+-			FSOUND_SetReserved( FSOUND_GetSubChannel( m_iChannel, i ), FALSE );
++			FSOUND_SetReserved( FSOUND_GetSubChannel( m_iChannel, i ), TFALSE );
+ 	}
+ 
+ 	m_eState   = STATE_STOP_REQUESTED;
+@@ -239,14 +247,14 @@
+ 	if ( a_bPause )
+ 	{
+ 		if ( ms_iPauseCount == 0 && m_iChannel != -1 )
+-			FSOUND_SetPaused( m_iChannel, TRUE );
++			FSOUND_SetPaused( m_iChannel, TTRUE );
+ 
+ 		ms_iPauseCount++;
+ 	}
+ 	else if ( ms_iPauseCount > 0 && --ms_iPauseCount == 0 )
+ 	{
+ 		if ( m_iChannel != -1 )
+-			FSOUND_SetPaused( m_iChannel, FALSE );
++			FSOUND_SetPaused( m_iChannel, TFALSE );
+ 	}
+ }
+ 
+@@ -345,8 +353,8 @@
+ 	if ( m_iCurrentStream < 0 || m_iCurrentStream >= m_iNumStreams )
+ 		return TFALSE;
+ 
+-	m_iChannel = FSOUND_Stream_PlayEx( FSOUND_FREE, (FSOUND_STREAM*)m_pStream, TNULL, TRUE );
+-	FSOUND_SetReserved( m_iChannel, TRUE );
++	m_iChannel = FSOUND_Stream_PlayEx( FSOUND_FREE, (FSOUND_STREAM*)m_pStream, TNULL, TTRUE );
++	FSOUND_SetReserved( m_iChannel, TTRUE );
+ 
+ 	m_eState          = STATE_PLAYING;
+ 	m_iNumSubChannels = FSOUND_GetNumSubChannels( m_iChannel );
+@@ -355,12 +363,12 @@
+ 	{
+ 		TINT iSubChannel = FSOUND_GetSubChannel( m_iChannel, i );
+ 		FSOUND_SetPan( iSubChannel, m_aStreams[ m_iCurrentStream ].aiPans[ i ] );
+-		FSOUND_SetReserved( iSubChannel, TRUE );
++		FSOUND_SetReserved( iSubChannel, TTRUE );
+ 		SetVolume( a_fVolume, i, TTRUE );
+ 	}
+ 
+ 	if ( ms_iPauseCount <= 0 )
+-		FSOUND_SetPaused( m_iChannel, FALSE );
++		FSOUND_SetPaused( m_iChannel, TFALSE );
+ 
+ 	return TTRUE;
+ }
+--- a/OpenBarnyard/Source/Terrain/ATerrainInterface.cpp
++++ b/OpenBarnyard/Source/Terrain/ATerrainInterface.cpp
+@@ -1257,7 +1257,7 @@
+ 	}
+ }
+ 
+-#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX )
+ 
+ // $Barnyard: FUNCTION 005e7cb0
+ static void RenderWorldWin( TModelInstance* a_pModelInstance )
+@@ -1329,7 +1329,7 @@
+ }
+ 
+ // $Barnyard: FUNCTION 005e83e0
+-static void RenderCellMeshWin( CellMeshSphere* a_pMeshSphere, RenderData* a_pRenderData )
++void RenderCellMeshWin( CellMeshSphere* a_pMeshSphere, RenderData* a_pRenderData )
+ {
+ 	TVALIDPTR( a_pMeshSphere );
+ 

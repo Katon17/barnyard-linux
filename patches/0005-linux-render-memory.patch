@@ -1,0 +1,60 @@
+diff --git a/Toshi/Source/Render/TRenderInterface.cpp b/Toshi/Source/Render/TRenderInterface.cpp
+index f0d6c7b..c252215 100644
+--- a/Toshi/Source/Render/TRenderInterface.cpp
++++ b/Toshi/Source/Render/TRenderInterface.cpp
+@@ -61,14 +61,14 @@ TBOOL TRenderInterface::Create()
+ 	TASSERT( TFALSE == IsCreated(), "TRender already created" );
+ 	m_pCreatedContext = CreateRenderContext();
+ 
+-#if defined( BARNYARD_COMMUNITY_PATCH ) && ( defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) )
+-#  ifdef TOSHI_SKU_WASM
++#if defined( BARNYARD_COMMUNITY_PATCH ) && ( defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX ) )
++#  if defined(TOSHI_SKU_WASM) || defined(TOSHI_SKU_LINUX)
+ 	constexpr TSIZE uiMemBlockSize = 64 * 1024 * 1024;
+ #  else
+ 	constexpr TSIZE uiMemBlockSize = 256 * 1024 * 1024;
+ #  endif
+ 
+-#  ifdef TOSHI_SKU_WASM
++#  if defined(TOSHI_SKU_WASM) || defined(TOSHI_SKU_LINUX)
+ 	m_pMemBlockRaw = calloc( 1, uiMemBlockSize );
+ #  else
+ 	m_pMemBlockRaw = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, uiMemBlockSize );
+@@ -107,7 +107,7 @@ TBOOL TRenderInterface::Destroy()
+ 	m_pCurrentContext = TNULL;
+ 	m_bCreated        = TFALSE;
+ 
+-#if defined( BARNYARD_COMMUNITY_PATCH ) && ( defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) )
++#if defined( BARNYARD_COMMUNITY_PATCH ) && ( defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX ) )
+ 
+ 	if ( m_pMemBlock )
+ 	{
+@@ -121,7 +121,7 @@ TBOOL TRenderInterface::Destroy()
+ 
+ 	if ( m_pMemBlockRaw )
+ 	{
+-#ifdef TOSHI_SKU_WASM
++#if defined(TOSHI_SKU_WASM) || defined(TOSHI_SKU_LINUX)
+ 		free( m_pMemBlockRaw );
+ #else
+ 		HeapFree( GetProcessHeap(), 0, m_pMemBlockRaw );
+@@ -268,7 +268,7 @@ void TRenderInterface::DumpStats()
+ 			pFile->CPrintf( "  Sub-version : %u\r\n", pAdapter->GetSubVersion() );
+ 			pFile->CPrintf( "  Build       : %u\r\n", pAdapter->GetBuild() );
+ 
+-#ifndef TOSHI_SKU_WASM
++#ifdef TOSHI_SKU_WINDOWS
+ 			// NOTE: retail prints the address of Data4 as the last number
+ 			const GUID* pGUID = TSTATICCAST( const GUID, pAdapter->GetDeviceIdentifier() );
+ 			pFile->CPrintf( "  GUID        : %u-%u-%u-%u\r\n", pGUID->Data1, pGUID->Data2, pGUID->Data3, pGUID->Data4 );
+diff --git a/Toshi/Source/Toshi/T2DList.cpp b/Toshi/Source/Toshi/T2DList.cpp
+index 0faeb16..fb9ff24 100644
+--- a/Toshi/Source/Toshi/T2DList.cpp
++++ b/Toshi/Source/Toshi/T2DList.cpp
+@@ -1,5 +1,5 @@
+-#include "T2DList.h"
+ #include "ToshiPCH.h"
++#include "T2DList.h"
+ 
+ //-----------------------------------------------------------------------------
+ // Enables memory debugging.

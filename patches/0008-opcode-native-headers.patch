@@ -1,0 +1,647 @@
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceAABB.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceAABB.cpp
+index d62b0ed..1b29bbe 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceAABB.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceAABB.cpp
+@@ -18,7 +18,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceContainer.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceContainer.cpp
+index 6b9be66..d62cb2a 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceContainer.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceContainer.cpp
+@@ -22,7 +22,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceCore;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceFPU.h b/Toshi/Vendor/Opcode/Source/Ice/IceFPU.h
+index d71e42a..8c4c124 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceFPU.h
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceFPU.h
+@@ -43,7 +43,7 @@
+ 	//! Fast square root for floating-point values.
+ 	inline_ float FastSqrt(float square)
+ 	{
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) || defined(TOSHI_SKU_LINUX)
+ 		int iBits;
+ 		memcpy( &iBits, &square, sizeof( iBits ) );
+ 		iBits = ( ( iBits - 0x3F800000 ) >> 1 ) + 0x3F800000;
+@@ -232,7 +232,7 @@
+ 	//! A global function to find MAX(a,b) using FCOMI/FCMOV
+ 	inline_ float FCMax2(float a, float b)
+ 	{
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) || defined(TOSHI_SKU_LINUX)
+ 		return b < a ? a : b;
+ #else
+ 		float Res;
+@@ -249,7 +249,7 @@
+ 	//! A global function to find MIN(a,b) using FCOMI/FCMOV
+ 	inline_ float FCMin2(float a, float b)
+ 	{
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) || defined(TOSHI_SKU_LINUX)
+ 		return a < b ? a : b;
+ #else
+ 		float Res;
+@@ -266,7 +266,7 @@
+ 	//! A global function to find MAX(a,b,c) using FCOMI/FCMOV
+ 	inline_ float FCMax3(float a, float b, float c)
+ 	{
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) || defined(TOSHI_SKU_LINUX)
+ 		float Res = c; if ( Res < b ) Res = b; if ( Res < a ) Res = a; return Res;
+ #else
+ 		float Res;
+@@ -286,7 +286,7 @@
+ 	//! A global function to find MIN(a,b,c) using FCOMI/FCMOV
+ 	inline_ float FCMin3(float a, float b, float c)
+ 	{
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) || defined(TOSHI_SKU_LINUX)
+ 		float Res = c; if ( b < Res ) Res = b; if ( a < Res ) Res = a; return Res;
+ #else
+ 		float Res;
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceHPoint.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceHPoint.cpp
+index f806a0c..3746639 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceHPoint.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceHPoint.cpp
+@@ -26,7 +26,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.cpp
+index ef76cd1..ceebd2c 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.cpp
+@@ -9,7 +9,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.h b/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.h
+index 8ec3cbf..1bb0c76 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.h
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceIndexedTriangle.h
+@@ -13,7 +13,7 @@
+ #define __ICEINDEXEDTRIANGLE_H__
+ 
+ 	// Forward declarations
+-	enum CubeIndex;
++	enum CubeIndex : int;
+ 
+ 	// An indexed triangle class.
+ 	class ICEMATHS_API IndexedTriangle
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceMatrix3x3.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceMatrix3x3.cpp
+index af56d3e..f80bd6e 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceMatrix3x3.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceMatrix3x3.cpp
+@@ -33,7 +33,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceMatrix4x4.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceMatrix4x4.cpp
+index 0b258f0..bb19611 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceMatrix4x4.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceMatrix4x4.cpp
+@@ -36,7 +36,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceMemoryMacros.h b/Toshi/Vendor/Opcode/Source/Ice/IceMemoryMacros.h
+index b7baa61..b276890 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceMemoryMacros.h
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceMemoryMacros.h
+@@ -54,7 +54,7 @@
+ 		//
+ 		//	2) for(udword i=0;i<nb;i++)	dest[i] = value;
+ 		//
+-#ifdef __EMSCRIPTEN__
++#if defined(__EMSCRIPTEN__) || defined(TOSHI_SKU_LINUX)
+ 		while ( nb-- ) *dest++ = value;
+ #else
+ 		_asm push eax
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceOBB.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceOBB.cpp
+index 0b1b6f7..5579ebb 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceOBB.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceOBB.cpp
+@@ -18,7 +18,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IcePlane.cpp b/Toshi/Vendor/Opcode/Source/Ice/IcePlane.cpp
+index 394b31b..36d617e 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IcePlane.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IcePlane.cpp
+@@ -18,7 +18,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IcePoint.cpp b/Toshi/Vendor/Opcode/Source/Ice/IcePoint.cpp
+index e715055..b116464 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IcePoint.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IcePoint.cpp
+@@ -46,7 +46,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceRandom.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceRandom.cpp
+index cc63a04..0f24e1c 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceRandom.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceRandom.cpp
+@@ -9,7 +9,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceCore;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceRay.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceRay.cpp
+index 6cf0330..78338ab 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceRay.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceRay.cpp
+@@ -59,7 +59,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceRevisitedRadix.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceRevisitedRadix.cpp
+index 3e351da..237d886 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceRevisitedRadix.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceRevisitedRadix.cpp
+@@ -49,7 +49,7 @@ To do:
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceCore;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceSegment.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceSegment.cpp
+index cd9ceb7..2a0a18e 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceSegment.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceSegment.cpp
+@@ -22,7 +22,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceTriangle.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceTriangle.cpp
+index 4268ff4..be1c65a 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceTriangle.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceTriangle.cpp
+@@ -9,7 +9,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceMaths;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceTypes.h b/Toshi/Vendor/Opcode/Source/Ice/IceTypes.h
+index 543be11..55e1ba1 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceTypes.h
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceTypes.h
+@@ -49,8 +49,8 @@
+ 	typedef unsigned short		uword;		//!< sizeof(uword)	must be 2
+ 	typedef signed int			sdword;		//!< sizeof(sdword)	must be 4
+ 	typedef unsigned int		udword;		//!< sizeof(udword)	must be 4
+-	typedef signed __int64		sqword;		//!< sizeof(sqword)	must be 8
+-	typedef unsigned __int64	uqword;		//!< sizeof(uqword)	must be 8
++	typedef signed long long		sqword;		//!< sizeof(sqword)	must be 8
++	typedef unsigned long long	uqword;		//!< sizeof(uqword)	must be 8
+ 	typedef float				float32;	//!< sizeof(float32)	must be 4
+ 	typedef double				float64;	//!< sizeof(float64)	must be 4
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Ice/IceUtils.cpp b/Toshi/Vendor/Opcode/Source/Ice/IceUtils.cpp
+index 29b6c57..d12ccf3 100644
+--- a/Toshi/Vendor/Opcode/Source/Ice/IceUtils.cpp
++++ b/Toshi/Vendor/Opcode/Source/Ice/IceUtils.cpp
+@@ -9,7 +9,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "../StdAfx.h"
+ 
+ using namespace IceCore;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_AABBCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_AABBCollider.cpp
+index 0a94292..972eced 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_AABBCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_AABBCollider.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_AABBTree.cpp b/Toshi/Vendor/Opcode/Source/OPC_AABBTree.cpp
+index c536e15..2f1a0fb 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_AABBTree.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_AABBTree.cpp
+@@ -44,7 +44,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_BaseModel.cpp b/Toshi/Vendor/Opcode/Source/OPC_BaseModel.cpp
+index 74a59d5..10c0ecf 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_BaseModel.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_BaseModel.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_BoxPruning.cpp b/Toshi/Vendor/Opcode/Source/OPC_BoxPruning.cpp
+index 6906160..3735a39 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_BoxPruning.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_BoxPruning.cpp
+@@ -30,7 +30,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_Collider.cpp b/Toshi/Vendor/Opcode/Source/OPC_Collider.cpp
+index f41fc36..c352618 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_Collider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_Collider.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_Common.cpp b/Toshi/Vendor/Opcode/Source/OPC_Common.cpp
+index 5b9a9c8..6bd9722 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_Common.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_Common.cpp
+@@ -43,6 +43,6 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_HybridModel.cpp b/Toshi/Vendor/Opcode/Source/OPC_HybridModel.cpp
+index a013056..4e92901 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_HybridModel.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_HybridModel.cpp
+@@ -82,7 +82,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_IceHook.h b/Toshi/Vendor/Opcode/Source/OPC_IceHook.h
+index e342eb6..0e6f204 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_IceHook.h
++++ b/Toshi/Vendor/Opcode/Source/OPC_IceHook.h
+@@ -18,7 +18,7 @@
+ 	#include <assert.h>
+ 	#include <string.h>
+ 	#include <float.h>
+-	#include <Math.h>
++	#include <math.h>
+ 
+ 	#ifndef ASSERT
+ 		#define	ASSERT(exp)	{}
+@@ -29,42 +29,42 @@
+ 	#define	SetIceError(...)	false
+ 	#define	EC_OUTOFMEMORY		"Out of memory"
+ 
+-	#include ".\Ice\IcePreprocessor.h"
++	#include "Ice/IcePreprocessor.h"
+ 
+ 	#undef ICECORE_API
+ 	#define ICECORE_API	OPCODE_API
+ 
+-	#include ".\Ice\IceTypes.h"
+-	#include ".\Ice\IceFPU.h"
+-	#include ".\Ice\IceMemoryMacros.h"
++	#include "Ice/IceTypes.h"
++	#include "Ice/IceFPU.h"
++	#include "Ice/IceMemoryMacros.h"
+ 
+ 	namespace IceCore
+ 	{
+-		#include ".\Ice\IceUtils.h"
+-		#include ".\Ice\IceContainer.h"
+-		#include ".\Ice\IcePairs.h"
+-		#include ".\Ice\IceRevisitedRadix.h"
+-		#include ".\Ice\IceRandom.h"
++		#include "Ice/IceUtils.h"
++		#include "Ice/IceContainer.h"
++		#include "Ice/IcePairs.h"
++		#include "Ice/IceRevisitedRadix.h"
++		#include "Ice/IceRandom.h"
+ 	}
+ 	using namespace IceCore;
+ 
+ 	#define ICEMATHS_API	OPCODE_API
+ 	namespace IceMaths
+ 	{
+-		#include ".\Ice\IceAxes.h"
+-		#include ".\Ice\IcePoint.h"
+-		#include ".\Ice\IceHPoint.h"
+-		#include ".\Ice\IceMatrix3x3.h"
+-		#include ".\Ice\IceMatrix4x4.h"
+-		#include ".\Ice\IcePlane.h"
+-		#include ".\Ice\IceRay.h"
+-		#include ".\Ice\IceIndexedTriangle.h"
+-		#include ".\Ice\IceTriangle.h"
+-		#include ".\Ice\IceTriList.h"
+-		#include ".\Ice\IceAABB.h"
+-		#include ".\Ice\IceOBB.h"
+-		#include ".\Ice\IceBoundingSphere.h"
+-		#include ".\Ice\IceSegment.h"
+-		#include ".\Ice\IceLSS.h"
++		#include "Ice/IceAxes.h"
++		#include "Ice/IcePoint.h"
++		#include "Ice/IceHPoint.h"
++		#include "Ice/IceMatrix3x3.h"
++		#include "Ice/IceMatrix4x4.h"
++		#include "Ice/IcePlane.h"
++		#include "Ice/IceRay.h"
++		#include "Ice/IceIndexedTriangle.h"
++		#include "Ice/IceTriangle.h"
++		#include "Ice/IceTrilist.h"
++		#include "Ice/IceAABB.h"
++		#include "Ice/IceOBB.h"
++		#include "Ice/IceBoundingSphere.h"
++		#include "Ice/IceSegment.h"
++		#include "Ice/IceLSS.h"
+ 	}
+ 	using namespace IceMaths;
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_LSSCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_LSSCollider.cpp
+index 8c0cf39..231111b 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_LSSCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_LSSCollider.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_MeshInterface.cpp b/Toshi/Vendor/Opcode/Source/OPC_MeshInterface.cpp
+index 2008b78..56b1c94 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_MeshInterface.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_MeshInterface.cpp
+@@ -116,7 +116,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_Model.cpp b/Toshi/Vendor/Opcode/Source/OPC_Model.cpp
+index 66508c1..5f167bf 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_Model.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_Model.cpp
+@@ -90,7 +90,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_OBBCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_OBBCollider.cpp
+index 38d619b..d94d240 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_OBBCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_OBBCollider.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_OptimizedTree.cpp b/Toshi/Vendor/Opcode/Source/OPC_OptimizedTree.cpp
+index 7d2a344..160e1b4 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_OptimizedTree.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_OptimizedTree.cpp
+@@ -66,7 +66,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_Picking.cpp b/Toshi/Vendor/Opcode/Source/OPC_Picking.cpp
+index 3b53774..5ddf481 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_Picking.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_Picking.cpp
+@@ -17,7 +17,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_PlanesCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_PlanesCollider.cpp
+index 2989628..26512e2 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_PlanesCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_PlanesCollider.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_RayCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_RayCollider.cpp
+index ddba9f4..a0157d1 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_RayCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_RayCollider.cpp
+@@ -112,7 +112,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_SphereCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_SphereCollider.cpp
+index 71dabc2..818025c 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_SphereCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_SphereCollider.cpp
+@@ -32,7 +32,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_SweepAndPrune.cpp b/Toshi/Vendor/Opcode/Source/OPC_SweepAndPrune.cpp
+index 3a26afd..e56e7ab 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_SweepAndPrune.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_SweepAndPrune.cpp
+@@ -17,7 +17,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_TreeBuilders.cpp b/Toshi/Vendor/Opcode/Source/OPC_TreeBuilders.cpp
+index d2359a0..37ee8a0 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_TreeBuilders.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_TreeBuilders.cpp
+@@ -50,7 +50,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_TreeCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_TreeCollider.cpp
+index f01c488..1e16e40 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_TreeCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_TreeCollider.cpp
+@@ -29,7 +29,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/OPC_VolumeCollider.cpp b/Toshi/Vendor/Opcode/Source/OPC_VolumeCollider.cpp
+index 9a71611..8278197 100644
+--- a/Toshi/Vendor/Opcode/Source/OPC_VolumeCollider.cpp
++++ b/Toshi/Vendor/Opcode/Source/OPC_VolumeCollider.cpp
+@@ -28,7 +28,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ using namespace Opcode;
+ 
+diff --git a/Toshi/Vendor/Opcode/Source/Opcode.cpp b/Toshi/Vendor/Opcode/Source/Opcode.cpp
+index 8c63c5e..904c92c 100644
+--- a/Toshi/Vendor/Opcode/Source/Opcode.cpp
++++ b/Toshi/Vendor/Opcode/Source/Opcode.cpp
+@@ -33,7 +33,7 @@
+ 
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ // Precompiled Header
+-#include "Stdafx.h"
++#include "StdAfx.h"
+ 
+ bool Opcode::InitOpcode()
+ {
+diff --git a/Toshi/Vendor/Opcode/Source/StdAfx.cpp b/Toshi/Vendor/Opcode/Source/StdAfx.cpp
+index 9c381f6..2350f92 100644
+--- a/Toshi/Vendor/Opcode/Source/StdAfx.cpp
++++ b/Toshi/Vendor/Opcode/Source/StdAfx.cpp
+@@ -7,4 +7,4 @@
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+ //#define ICE_MAIN
+-#include "Stdafx.h"
++#include "StdAfx.h"

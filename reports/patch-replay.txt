@@ -1,0 +1,1 @@
+PASS: pristine pinned upstream -> all 22 patches -> byte-identical working source (122 tracked files)

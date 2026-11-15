@@ -1,0 +1,92 @@
+diff --git a/OpenBarnyard/Source/Assets/AModelLoader.h b/OpenBarnyard/Source/Assets/AModelLoader.h
+index 37f2ef1..0151897 100644
+--- a/OpenBarnyard/Source/Assets/AModelLoader.h
++++ b/OpenBarnyard/Source/Assets/AModelLoader.h
+@@ -13,7 +13,7 @@
+ 
+ #include <Render/TBackend.h>
+ 
+-#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM )
++#if defined( TOSHI_SKU_WINDOWS ) || defined( TOSHI_SKU_WASM ) || defined( TOSHI_SKU_LINUX )
+ #  include <Render/TTMDWin.h>
+ #endif
+ 
+diff --git a/OpenBarnyard/Source/HUD/AHudElement.h b/OpenBarnyard/Source/HUD/AHudElement.h
+index 36b2072..355c4eb 100644
+--- a/OpenBarnyard/Source/HUD/AHudElement.h
++++ b/OpenBarnyard/Source/HUD/AHudElement.h
+@@ -82,4 +82,9 @@ protected:
+ 	TBOOL m_bForceHide;
+ 	TBOOL m_bCurrentlyVisible;
+ 	TBOOL m_bOwnedByManager;
++#ifdef TOSHI_SKU_LINUX
++    // GCC's Itanium ABI otherwise reuses this base's 1-byte tail padding in
++    // derived HUDs. Occupy the existing byte to retain retail member offsets.
++    unsigned char m_linuxTailPadding = 0;
++#endif
+ };
+diff --git a/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.cpp b/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.cpp
+index e6df74d..7fb3442 100644
+--- a/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.cpp
++++ b/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.cpp
+@@ -25,7 +25,7 @@ ASysMeshHAL::ASysMeshHAL()
+ 
+ TBOOL ASysMeshHAL::Render()
+ {
+-	if ( ms_bStopRendering == FALSE )
++	if ( ms_bStopRendering == TFALSE )
+ 	{
+ 		auto pRenderPacket = GetMaterial()->AddRenderPacket( this );
+ 
+diff --git a/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.h b/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.h
+index 793ad90..96f3572 100644
+--- a/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.h
++++ b/OpenBarnyard/Source/Platform/GL/ASysShader/ASysMesh_GL.h
+@@ -16,7 +16,7 @@ public:
+ 	TINT GetZBias() const { return m_iZBias; }
+ 
+ public:
+-	inline static BOOL ms_bStopRendering;
++	inline static TBOOL ms_bStopRendering;
+ 
+ private:
+ 	TINT m_iZBias;
+diff --git a/OpenBarnyard/Source/Units/ACharacterUnit.h b/OpenBarnyard/Source/Units/ACharacterUnit.h
+index 669c8d1..605f46a 100644
+--- a/OpenBarnyard/Source/Units/ACharacterUnit.h
++++ b/OpenBarnyard/Source/Units/ACharacterUnit.h
+@@ -52,6 +52,9 @@ public:
+ private:
+ 	TFLOAT    m_fOpacity;   // 0x98
+ 	FADEFLAGS m_eFadeFlags; // 0x9c
++#ifdef TOSHI_SKU_LINUX
++    unsigned char m_linuxTailPadding[3]{}; // occupy existing tail bytes, preserve sizeof
++#endif
+ };
+ 
+ TSTATICASSERT( sizeof( ACharacterUnit ) == 0xa0 );
+diff --git a/OpenBarnyard/Source/Units/ASoundComponent.h b/OpenBarnyard/Source/Units/ASoundComponent.h
+index ebeffbe..d79ec1e 100644
+--- a/OpenBarnyard/Source/Units/ASoundComponent.h
++++ b/OpenBarnyard/Source/Units/ASoundComponent.h
+@@ -3,6 +3,8 @@
+ #include "AUnitStaticData.h"
+ #include "Sound/ASoundLegacy.h"
+ 
++class ASoundComponentData;
++
+ //-----------------------------------------------------------------------------
+ // Lets the FSM scripts of a unit play random sounds at its position
+ // ("PlaySound" native), without overlapping and not too often.
+diff --git a/OpenBarnyard/Source/Units/AUnitComponent.h b/OpenBarnyard/Source/Units/AUnitComponent.h
+index c017165..c39ab9e 100644
+--- a/OpenBarnyard/Source/Units/AUnitComponent.h
++++ b/OpenBarnyard/Source/Units/AUnitComponent.h
+@@ -55,4 +55,7 @@ public:
+ protected:
+ 	Toshi::TRef<AUnitProxy> m_oOwner;     // 0x08, the owning unit's proxy
+ 	TBOOL                   m_bAIEnabled; // 0x0c
++#ifdef TOSHI_SKU_LINUX
++    unsigned char m_linuxTailPadding[3]{}; // retain MSVC derived-member offsets
++#endif
+ };
