@@ -33,11 +33,24 @@ Screenshot asli dari pengguna; hak artwork game tetap pada pemiliknya. Gambar in
 
 Terjemahan Indonesia masih draf mesin dengan perbaikan istilah, bukan lokalisasi resmi yang sudah diperiksa manusia sepenuhnya. Suara asli dan aset dasar English UK tidak diubah. Sebagian HUD yang di-cache mungkin membutuhkan restart setelah ganti bahasa.
 
-## Kebutuhan
+## Spesifikasi minimum
 
-- Linux Mint 22.x atau Ubuntu 24.04 **amd64**, dengan pustaka multiarch i386.
-- Driver OpenGL yang berfungsi dan desktop X11. Pengujian fisik pengguna memakai Xfce/X11 dan Intel HD 620; GPU lain, Wayland, dan distro lain belum disertifikasi secara independen.
-- Salinan PC Barnyard yang dimiliki secara sah, dengan data lengkap. Repositori ini tidak menyediakan, mengunduh, atau membantu memperoleh file game proprietary.
+**Perkiraan acuan, bukan batas hardware yang sudah diukur.** Kebutuhan GPU/API dan arsitektur OS berasal dari runtime/paket; angka CPU, RAM, dan ruang kosong di bawah adalah perkiraan awal konservatif, bukan minimum hasil benchmark atau janji 60 FPS.
+
+| Komponen | Minimum / perkiraan awal |
+| --- | --- |
+| OS | Linux Mint 22.x atau Ubuntu 24.04 **64-bit amd64**, dengan multiarch i386 aktif |
+| CPU | Prosesor x86-64 yang dapat menjalankan aplikasi x86 32-bit; dual-core sekitar 2 GHz sebagai saran awal yang belum divalidasi |
+| RAM | Disarankan 4 GB RAM sistem; pemakaian aktual game/desktop belum diprofilkan |
+| Grafis | GPU dan driver Linux dengan dukungan **OpenGL 3.3 core profile**; hardware yang hanya mendukung OpenGL lebih lama tidak cukup |
+| Layar | Desktop X11; jendela awal game 800 × 600. Resolusi lain bergantung layar/driver |
+| Penyimpanan | Data PC game lengkap milik sendiri, ditambah sekitar 1 GB ruang kosong untuk dependensi paket, save, dan log; ukuran unduhan/instalasi dependensi sebenarnya bisa berbeda |
+| Input | Keyboard dan mouse |
+| Data game | Data PC Barnyard lengkap yang diperoleh secara sah; tidak dibundel atau diunduh oleh proyek ini |
+
+### Perangkat acuan yang diuji pengguna
+
+**ThinkPad X270 — Intel Core i7-7600U, Intel HD Graphics 620, RAM 8 GB, Linux Mint 22.3 Xfce/X11.** Pengguna melaporkan permainan lancar sekitar **60 FPS** pada perangkat ini. Ini acuan laporan pengguna, bukan spesifikasi minimum, benchmark otomatis, atau jaminan untuk perangkat lain. GPU lain, Wayland, dan distro lain belum disertifikasi secara independen.
 
 ## Instalasi
 

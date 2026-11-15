@@ -33,11 +33,24 @@ Actual user-supplied screenshots; game artwork belongs to its respective owners.
 
 Indonesian text is a machine-translation draft with curated terminology, not a fully human-reviewed official localization. Voices and original English UK backing assets are unchanged. Some cached HUD text may require restarting after a language change.
 
-## Requirements
+## Minimum specifications
 
-- Linux Mint 22.x or Ubuntu 24.04 **amd64**, with i386 multiarch libraries.
-- Working OpenGL driver and an X11 desktop. The tested physical setup used Xfce/X11 and Intel HD 620; other GPUs, Wayland and other distributions are not independently certified.
-- A legally owned PC copy of Barnyard and its complete game data. This repository does not supply, download or help obtain proprietary game files.
+**Planning estimates, not a measured hardware cutoff.** The GPU/API and OS architecture requirements come from the runtime/package; CPU, RAM and spare-storage figures below are conservative starting estimates, not benchmark-validated minimums or a 60 FPS promise.
+
+| Component | Minimum / starting estimate |
+| --- | --- |
+| OS | Linux Mint 22.x or Ubuntu 24.04 **64-bit amd64**, with i386 multiarch enabled |
+| CPU | x86-64 processor able to execute 32-bit x86 applications; dual-core around 2 GHz suggested as an unvalidated starting point |
+| RAM | 4 GB system RAM suggested; actual game/desktop usage has not been profiled |
+| Graphics | GPU and Linux driver supporting **OpenGL 3.3 core profile**; older OpenGL-only hardware is insufficient |
+| Display | X11 desktop; 800 × 600 initial game window. Other resolutions depend on the display/driver |
+| Storage | Complete owned PC game data, plus approximately 1 GB spare for package dependencies, saves and logs; actual dependency download/installed size varies |
+| Input | Keyboard and mouse |
+| Game data | Complete, legally obtained PC Barnyard data; not bundled or downloaded by this project |
+
+### User-tested reference hardware
+
+**ThinkPad X270 — Intel Core i7-7600U, Intel HD Graphics 620, 8 GB RAM, Linux Mint 22.3 Xfce/X11.** The user reported smooth play around **60 FPS** on this setup. This is a reference report, not the minimum specification, an automated benchmark or a guarantee for other hardware. Other GPUs, Wayland and other distributions are not independently certified.
 
 ## Installation
 
